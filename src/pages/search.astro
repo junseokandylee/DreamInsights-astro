@@ -4,13 +4,84 @@ import { query } from '../lib/db';
 
 export const prerender = false;
 
+// ── Bot Detection ─────────────────────────────
+const ua = Astro.request.headers.get('user-agent') || '';
+const BOT_PATTERNS = /bot|crawl|spider|slurp|mediapartners|preview|fetch|curl|wget|python|java|httpclient|scrapy|phantom|selenium|headless/i;
+
+function isLikelyBot(userAgent: string): boolean {
+  return BOT_PATTERNS.test(userAgent);
+}
+
+// ── Rate Limiter (in-memory, per-IP) ───────────
+const searchLimiter = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = 10; // requests per window
+const RATE_WINDOW = 60_000; // 1 minute
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = searchLimiter.get(ip);
+  if (!entry || now > entry.resetAt) {
+    searchLimiter.set(ip, { count: 1, resetAt: now + RATE_WINDOW });
+    return false;
+  }
+  entry.count++;
+  return entry.count > RATE_LIMIT;
+}
+
+// Clean stale entries periodically
+if (searchLimiter.size > 10000) {
+  const now = Date.now();
+  for (const [key, val] of searchLimiter) {
+    if (now > val.resetAt) searchLimiter.delete(key);
+  }
+}
+
+// ── Request Validation ─────────────────────────
 const q = Astro.url.searchParams.get('q') || '';
 const decodedQ = decodeURIComponent(q);
+const honeypot = Astro.url.searchParams.get('website') || '';
+const clientCheck = Astro.url.searchParams.get('_ts') || '';
+const clientIp = Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+  || Astro.request.headers.get('cf-connecting-ip')
+  || 'unknown';
 
+let blocked = false;
+let blockReason = '';
+
+// 1) Honeypot: hidden field that bots auto-fill
+if (honeypot.length > 0) {
+  blocked = true;
+  blockReason = 'honeypot';
+}
+
+// 2) Client-side JS timestamp check (bots often skip JS)
+if (!blocked && decodedQ.trim().length >= 2) {
+  const ts = parseInt(clientCheck, 10);
+  const now = Date.now();
+  // _ts is set by JS on form submit. If missing or too far in past/future → bot
+  if (!clientCheck || isNaN(ts) || ts < now - 300000 || ts > now + 60000) {
+    blocked = true;
+    blockReason = 'timestamp';
+  }
+}
+
+// 3) Rate limiting
+if (!blocked && isRateLimited(clientIp)) {
+  blocked = true;
+  blockReason = 'rate';
+}
+
+// 4) Bot UA filter
+if (!blocked && isLikelyBot(ua)) {
+  blocked = true;
+  blockReason = 'bot';
+}
+
+// ── Search Execution (only if not blocked) ─────
 let dreams: any[] = [];
 let totalCount = 0;
 
-if (decodedQ.trim()) {
+if (decodedQ.trim() && !blocked) {
   const searchTerm = `%${decodedQ.trim()}%`;
   const [results, count] = await Promise.all([
     query<any>(`
@@ -42,16 +113,25 @@ if (decodedQ.trim()) {
   <div style="max-width:var(--max-width-wide); margin:0 auto; padding:var(--space-8) var(--space-4);">
 
     <!-- Search Bar -->
-    <form action="/search" method="get" style="max-width:600px; margin:0 auto var(--space-10);">
+    <form id="search-form" action="/search" method="get" style="max-width:600px; margin:0 auto var(--space-10);">
       <div style="position:relative;">
         <svg style="position:absolute; left:var(--space-4); top:50%; transform:translateY(-50%); color:var(--color-text-tertiary);" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
         <input type="search" name="q" class="search-input" value={decodedQ} placeholder="꿈을 검색하세요… (예: 물고기, 이사, 합격)" autocomplete="off" autofocus={!!decodedQ} />
+        <!-- Honeypot: invisible to humans, bots auto-fill -->
+        <input type="text" name="website" value="" tabindex="-1" autocomplete="off" style="position:absolute; left:-9999px; top:-9999px; width:1px; height:1px; opacity:0; pointer-events:none;" aria-hidden="true" />
+        <!-- Client timestamp: set by JS on submit -->
+        <input type="hidden" name="_ts" id="search-ts" value="" />
       </div>
     </form>
 
-    {decodedQ.trim() ? (
+    {blocked ? (
+      <div style="text-align:center; padding:var(--space-16) var(--space-4);">
+        <p style="font-size:var(--font-size-xl); color:var(--color-text-primary); font-weight:var(--font-weight-semibold); margin-bottom:var(--space-4);">🤖 잠시만 기다려주세요</p>
+        <p style="color:var(--color-text-secondary); max-width:400px; margin:0 auto;">자동화된 요청이 감지되어 검색이 일시적으로 제한되었습니다. 잠시 후 다시 시도해 주세요.</p>
+      </div>
+    ) : decodedQ.trim() ? (
       <div>
         <!-- Result Header -->
         <div style="margin-bottom:var(--space-6);">
@@ -92,4 +172,11 @@ if (decodedQ.trim()) {
       </div>
     )}
   </div>
+
+  <!-- Client-side: set timestamp on form submit -->
+  <script is:inline>
+    document.getElementById('search-form').addEventListener('submit', () => {
+      document.getElementById('search-ts').value = Date.now();
+    });
+  </script>
 </BaseLayout>

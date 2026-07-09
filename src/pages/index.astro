@@ -60,7 +60,7 @@ const [popularDreams, trendingDreams, categories] = await Promise.all([
         <svg style="position:absolute; left:var(--space-4); top:50%; transform:translateY(-50%); color:var(--color-text-tertiary);" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
-        <form action="/search" method="get">
+        <form id="home-search-form" action="/search" method="get">
           <input
             type="search"
             name="q"
@@ -69,6 +69,8 @@ const [popularDreams, trendingDreams, categories] = await Promise.all([
             autocomplete="off"
             style="padding-left:var(--space-10); height:48px; font-size:var(--font-size-base); background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.12); color:var(--color-text-on-dark); backdrop-filter:blur(8px);"
           />
+          <input type="text" name="website" value="" tabindex="-1" autocomplete="off" style="position:absolute; left:-9999px; top:-9999px; width:1px; height:1px; opacity:0; pointer-events:none;" aria-hidden="true" />
+          <input type="hidden" name="_ts" id="home-search-ts" value="" />
         </form>
       </div>
     </div>
@@ -164,4 +166,9 @@ const [popularDreams, trendingDreams, categories] = await Promise.all([
     </article>
   </section>
 
+  <script is:inline>
+    document.getElementById('home-search-form').addEventListener('submit', () => {
+      document.getElementById('home-search-ts').value = Date.now();
+    });
+  </script>
 </BaseLayout>
