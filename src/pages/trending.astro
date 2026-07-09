@@ -1,0 +1,100 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { query } from '../lib/db';
+
+export const prerender = false;
+
+const [popularRecent, popularAllTime] = await Promise.all([
+  query<any>(`
+    SELECT d.id, d.original_slug as slug, d.views,
+           t.title, t.summary,
+           c.name as category_name
+    FROM dream_interpretations d
+    JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true
+    LEFT JOIN categories c ON d.category_id = c.id
+    WHERE d.is_active = true AND d.created_at > NOW() - INTERVAL '30 days'
+    ORDER BY d.views DESC NULLS LAST
+    LIMIT 12
+  `),
+  query<any>(`
+    SELECT d.id, d.original_slug as slug, d.views,
+           t.title, t.summary,
+           c.name as category_name
+    FROM dream_interpretations d
+    JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true
+    LEFT JOIN categories c ON d.category_id = c.id
+    WHERE d.is_active = true
+    ORDER BY d.views DESC NULLS LAST
+    LIMIT 12
+  `)
+]);
+---
+
+<BaseLayout title="인기 꿈 해몽 - 드림디비" description="가장 많이 조회된 꿈 해몽과 최근 30일 인기 해몽을 확인하세요.">
+  <div style="max-width:var(--max-width-wide); margin:0 auto; padding:var(--space-8) var(--space-4);">
+
+    <!-- Tabs -->
+    <div style="display:flex; gap:var(--space-1); margin-bottom:var(--space-8); border-bottom:1px solid var(--color-border-default);">
+      <button class="trending-tab trending-tab-active" data-target="recent" style="padding:var(--space-3) var(--space-5); font-size:var(--font-size-base); font-weight:var(--font-weight-medium); border:none; background:transparent; cursor:pointer; border-bottom:2px solid var(--color-accent); color:var(--color-accent);">최근 30일 🔥</button>
+      <button class="trending-tab" data-target="alltime" style="padding:var(--space-3) var(--space-5); font-size:var(--font-size-base); font-weight:var(--font-weight-medium); border:none; background:transparent; cursor:pointer; border-bottom:2px solid transparent; color:var(--color-text-secondary);">역대 인기 🏆</button>
+    </div>
+
+    <!-- Recent Trending -->
+    <div id="tab-recent" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:var(--space-4);">
+      {popularRecent.map((dream: any, i: number) => (
+        <a href={`/dream/${dream.slug}`} class="card" style="padding:var(--space-5); text-decoration:none; display:flex; flex-direction:column;">
+          <div style="display:flex; align-items:center; gap:var(--space-2); margin-bottom:var(--space-3);">
+            <span style="font-family:var(--font-family-display); font-size:var(--font-size-xl); font-weight:var(--font-weight-bold); color:var(--color-dream-primary); opacity:0.5;">{i + 1}</span>
+            {dream.category_name && <span class="category-pill">{dream.category_name}</span>}
+            <span style="margin-left:auto; font-size:var(--font-size-xs); color:var(--color-text-tertiary);">👁 {(dream.views || 0).toLocaleString()}</span>
+          </div>
+          <h3 style="font-family:var(--font-family-display); font-size:var(--font-size-md); font-weight:var(--font-weight-semibold); color:var(--color-text-primary); line-height:var(--line-height-snug); margin-bottom:var(--space-2); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
+            {dream.title}
+          </h3>
+          <p style="font-size:var(--font-size-sm); color:var(--color-text-secondary); line-height:var(--line-height-normal); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; flex:1;">
+            {dream.summary || dream.content?.slice(0, 120)}
+          </p>
+        </a>
+      ))}
+    </div>
+
+    <!-- All-time Popular (hidden by default) -->
+    <div id="tab-alltime" style="display:none; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:var(--space-4);">
+      {popularAllTime.map((dream: any, i: number) => (
+        <a href={`/dream/${dream.slug}`} class="card" style="padding:var(--space-5); text-decoration:none; display:flex; flex-direction:column;">
+          <div style="display:flex; align-items:center; gap:var(--space-2); margin-bottom:var(--space-3);">
+            <span style="font-family:var(--font-family-display); font-size:var(--font-size-xl); font-weight:var(--font-weight-bold); color:var(--color-dream-primary); opacity:0.5;">{i + 1}</span>
+            {dream.category_name && <span class="category-pill">{dream.category_name}</span>}
+            <span style="margin-left:auto; font-size:var(--font-size-xs); color:var(--color-text-tertiary);">👁 {(dream.views || 0).toLocaleString()}</span>
+          </div>
+          <h3 style="font-family:var(--font-family-display); font-size:var(--font-size-md); font-weight:var(--font-weight-semibold); color:var(--color-text-primary); line-height:var(--line-height-snug); margin-bottom:var(--space-2); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
+            {dream.title}
+          </h3>
+          <p style="font-size:var(--font-size-sm); color:var(--color-text-secondary); line-height:var(--line-height-normal); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; flex:1;">
+            {dream.summary || dream.content?.slice(0, 120)}
+          </p>
+        </a>
+      ))}
+    </div>
+  </div>
+
+  <script is:inline>
+    document.querySelectorAll('.trending-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.trending-tab').forEach(t => {
+          t.style.borderBottom = '2px solid transparent';
+          t.style.color = 'var(--color-text-secondary)';
+          t.classList.remove('trending-tab-active');
+        });
+        tab.style.borderBottom = '2px solid var(--color-accent)';
+        tab.style.color = 'var(--color-accent)';
+        tab.classList.add('trending-tab-active');
+
+        const target = tab.dataset.target;
+        document.querySelectorAll('#tab-recent, #tab-alltime').forEach(panel => {
+          panel.style.display = panel.id === 'tab-' + target ? 'grid' : 'none';
+        });
+      });
+    });
+  </script>
+</BaseLayout>

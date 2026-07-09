@@ -1,0 +1,16 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+<BaseLayout title="페이지를 찾을 수 없습니다 - 드림디비">
+  <div style="max-width:var(--max-width-content); margin:0 auto; padding:var(--space-20) var(--space-4); text-align:center;">
+    <p style="font-size:64px; margin-bottom:var(--space-6);">🌙</p>
+    <h1 style="font-family:var(--font-family-display); font-size:var(--font-size-2xl); font-weight:var(--font-weight-bold); color:var(--color-text-primary); margin-bottom:var(--space-4);">페이지를 찾을 수 없습니다</h1>
+    <p style="font-size:var(--font-size-lg); color:var(--color-text-secondary); margin-bottom:var(--space-8); max-width:400px; margin-left:auto; margin-right:auto;">
+      요청하신 페이지가 존재하지 않거나 이동되었을 수 있습니다.
+    </p>
+    <div style="display:flex; gap:var(--space-3); justify-content:center;">
+      <a href="/" style="display:inline-flex; align-items:center; gap:var(--space-2); padding:var(--space-3) var(--space-6); background:var(--color-accent); color:white; border-radius:var(--radius-full); font-weight:var(--font-weight-medium); text-decoration:none; transition:background var(--transition-fast);">홈으로 가기</a>
+      <a href="/search" style="display:inline-flex; align-items:center; gap:var(--space-2); padding:var(--space-3) var(--space-6); background:var(--color-background-muted); color:var(--color-text-primary); border:1px solid var(--color-border-default); border-radius:var(--radius-full); font-weight:var(--font-weight-medium); text-decoration:none; transition:all var(--transition-fast);">꿈 검색하기</a>
+    </div>
+  </div>
+</BaseLayout>

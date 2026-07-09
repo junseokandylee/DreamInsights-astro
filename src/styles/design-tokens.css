@@ -1,0 +1,105 @@
+/* ============================================
+   DreamInsights Design System
+   Based on Meta Astryx, adapted for dream content site
+   Light mode optimized for readability & SEO ad revenue
+   ============================================ */
+
+/* ── Dream-Specific Color Palette ──────────── */
+:root {
+  /* Brand: Dreamy blue-purple gradient feel, but staying clean */
+  --color-accent:               #0064E0;
+  --color-accent-hover:         #0057C2;
+  --color-accent-muted:         rgba(0,130,251,0.10);
+  --color-on-accent:            #FFFFFF;
+
+  /* Dream content: warm violet for category tags */
+  --color-dream-primary:       #6C3FC5;
+  --color-dream-secondary:     #8B5CF6;
+  --color-dream-muted:          rgba(108,63,197,0.08);
+
+  /* Status */
+  --color-success:              #0D8626;
+  --color-error:                #E3193B;
+  --color-warning:              #E9AF08;
+
+  /* Surfaces — SEO-optimized: clean white, high contrast */
+  --color-background-body:      #F7F8FA;
+  --color-background-surface:   #FFFFFF;
+  --color-background-muted:     rgba(5,54,89,0.04);
+  --color-background-card:      #FFFFFF;
+  --color-background-hover:     rgba(5,54,89,0.03);
+  --color-background-hero:      linear-gradient(135deg, #0A0E27 0%, #1A1040 40%, #0D2847 100%);
+
+  /* Text — maximum readability for long-form dream content */
+  --color-text-primary:         #1A1D23;
+  --color-text-secondary:       #5C6370;
+  --color-text-tertiary:        #8A8F98;
+  --color-text-on-dark:         #F0F2F5;
+  --color-text-on-dark-secondary: #A0A6B2;
+  --color-text-link:            #0064E0;
+
+  /* Borders */
+  --color-border-default:       rgba(5,54,89,0.08);
+  --color-border-emphasized:    #D0D5DD;
+  --color-border-card:          rgba(5,54,89,0.06);
+
+  /* ── Typography (Noto Sans KR for Korean readability) ── */
+  --font-family-display:        'Figtree', system-ui, -apple-system, sans-serif;
+  --font-family-body:           'Figtree', system-ui, -apple-system, sans-serif;
+  --font-size-2xs:              11px;
+  --font-size-xs:               12px;
+  --font-size-sm:               13px;
+  --font-size-base:             15px;
+  --font-size-md:               16px;
+  --font-size-lg:               18px;
+  --font-size-xl:               22px;
+  --font-size-2xl:              28px;
+  --font-size-3xl:              36px;
+  --font-size-4xl:              48px;
+  --font-weight-normal:         400;
+  --font-weight-medium:         500;
+  --font-weight-semibold:       600;
+  --font-weight-bold:           700;
+  --line-height-tight:         1.25;
+  --line-height-snug:          1.375;
+  --line-height-normal:        1.6;
+  --line-height-relaxed:        1.75;
+
+  /* ── Spacing ─────────────────────────────── */
+  --space-1:                    4px;
+  --space-2:                    8px;
+  --space-3:                    12px;
+  --space-4:                    16px;
+  --space-5:                    20px;
+  --space-6:                    24px;
+  --space-8:                    32px;
+  --space-10:                   40px;
+  --space-12:                   48px;
+  --space-16:                   64px;
+  --space-20:                   80px;
+
+  /* ── Border Radius ───────────────────────── */
+  --radius-sm:                  6px;
+  --radius-md:                  8px;
+  --radius-lg:                  12px;
+  --radius-xl:                  16px;
+  --radius-2xl:                 20px;
+  --radius-full:                9999px;
+
+  /* ── Shadows ──────────────────────────────── */
+  --shadow-xs:                  0 1px 2px rgba(5,54,89,0.04);
+  --shadow-sm:                   0 1px 3px rgba(5,54,89,0.06), 0 1px 2px rgba(5,54,89,0.04);
+  --shadow-md:                  0 4px 12px rgba(5,54,89,0.06);
+  --shadow-lg:                  0 8px 24px rgba(5,54,89,0.08);
+  --shadow-card:                0 1px 3px rgba(5,54,89,0.04), 0 0 0 1px var(--color-border-card);
+  --shadow-card-hover:          0 8px 24px rgba(5,54,89,0.10), 0 0 0 1px var(--color-border-default);
+
+  /* ── Transitions ──────────────────────────── */
+  --transition-fast:            150ms cubic-bezier(0.2, 0, 0, 1);
+  --transition-base:            200ms cubic-bezier(0.2, 0, 0, 1);
+  --transition-slow:            300ms cubic-bezier(0.2, 0, 0, 1);
+
+  /* ── Layout ──────────────────────────────── */
+  --max-width-content:           720px;
+  --max-width-wide:              1200px;
+}

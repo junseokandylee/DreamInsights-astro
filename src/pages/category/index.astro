@@ -1,0 +1,37 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { query } from '../../lib/db';
+
+const categories = await query<any>(`
+  SELECT c.name, c.slug, COUNT(*) as dream_count
+  FROM categories c
+  JOIN dream_interpretations d ON d.category_id = c.id AND d.is_active = true
+  JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true
+  GROUP BY c.name, c.slug
+  HAVING COUNT(*) > 0
+  ORDER BY COUNT(*) DESC
+`);
+---
+
+<BaseLayout title="꿈 해몽 카테고리 - 드림디비" description="동물, 자연, 사람, 돈, 건강 등 카테고리별 꿈 해몽을 확인하세요.">
+  <div style="max-width:var(--max-width-content); margin:0 auto; padding:var(--space-8) var(--space-4);">
+    <h1 class="heading-1" style="margin-bottom:var(--space-3);">카테고리</h1>
+    <p style="color:var(--color-text-secondary); margin-bottom:var(--space-8);">관심 있는 카테고리를 선택해 꿈 해몽을 확인하세요.</p>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:var(--space-4);">
+      {categories.map((cat: any) => (
+        <a href={`/category/${cat.slug}`} class="card" style="padding:var(--space-5); text-decoration:none; text-align:center;">
+          <div style="font-size:24px; margin-bottom:var(--space-2);">
+            {cat.slug === 'animal' ? '🐾' : cat.slug === 'nature' ? '🌿' : cat.slug === 'money' ? '💰' : cat.slug === 'person' ? '👤' : cat.slug === 'death' ? '🪦' : cat.slug === 'food' ? '🍽️' : cat.slug === 'traffic' ? '🚗' : cat.slug === 'house' ? '🏠' : cat.slug === 'marriage' ? '💍' : cat.slug === 'birth' ? '👶' : '🌙'}
+          </div>
+          <h2 style="font-size:var(--font-size-base); font-weight:var(--font-weight-semibold); color:var(--color-text-primary); margin-bottom:var(--space-1);">
+            {cat.name}
+          </h2>
+          <span style="font-size:var(--font-size-xs); color:var(--color-text-tertiary);">
+            {cat.dream_count.toLocaleString()}개 해몽
+          </span>
+        </a>
+      ))}
+    </div>
+  </div>
+</BaseLayout>
