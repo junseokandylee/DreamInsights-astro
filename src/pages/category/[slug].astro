@@ -6,18 +6,16 @@ export const prerender = false;
 
 const { slug } = Astro.params;
 const decodedSlug = decodeURIComponent(slug || 'all');
+const page = Math.max(1, parseInt(Astro.url.searchParams.get('page') || '1', 10) || 1);
+const PER_PAGE = 24;
 
-// Category info
 let category = null;
 let categoryName = '전체 카테고리';
 const categoryList = await query<any>(`
-  SELECT name, slug, COUNT(*) as dream_count
-  FROM categories c
+  SELECT name, slug, COUNT(*) as dream_count FROM categories c
   JOIN dream_interpretations d ON d.category_id = c.id AND d.is_active = true
   JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true
-  GROUP BY c.name, c.slug
-  HAVING COUNT(*) > 0
-  ORDER BY COUNT(*) DESC
+  GROUP BY c.name, c.slug HAVING COUNT(*) > 0 ORDER BY COUNT(*) DESC
 `);
 
 if (slug && slug !== 'all') {
@@ -26,61 +24,73 @@ if (slug && slug !== 'all') {
   categoryName = category?.name || decodedSlug;
 }
 
-// Dreams
-const dreams = await query<any>(`
-  SELECT d.id, d.original_slug as slug, d.views,
-         t.title, t.summary, t.content,
-         c.name as category_name, c.slug as category_slug
-  FROM dream_interpretations d
-  JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true
-  LEFT JOIN categories c ON d.category_id = c.id
-  ${category ? `WHERE d.category_id = (SELECT id FROM categories WHERE slug = $1)` : ''}
-  AND d.is_active = true
-  ORDER BY d.views DESC NULLS LAST
-  LIMIT 24
-`, category ? [decodedSlug] : []);
+const offset = (page - 1) * PER_PAGE;
+const [dreams, countResult] = await Promise.all([
+  query<any>(`SELECT d.id, d.original_slug as slug, d.views, t.title, t.summary, t.content, c.name as category_name, c.slug as category_slug FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true LEFT JOIN categories c ON d.category_id = c.id ${category ? `WHERE d.category_id = (SELECT id FROM categories WHERE slug = $1)` : 'WHERE 1=1'} AND d.is_active = true ORDER BY d.views DESC NULLS LAST LIMIT ${PER_PAGE} OFFSET ${offset}`, category ? [decodedSlug] : []),
+  query<any>(`SELECT COUNT(*) as total FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true ${category ? `WHERE d.category_id = (SELECT id FROM categories WHERE slug = $1)` : 'WHERE 1=1'} AND d.is_active = true`, category ? [decodedSlug] : [])
+]);
+
+const totalCount = countResult[0]?.total || 0;
+const totalPages = Math.ceil(totalCount / PER_PAGE);
+const baseUrl = 'https://dream-db.net';
 ---
 
-<BaseLayout title={`${categoryName} 꿈 해몽 - 드림디비`} description={`${categoryName}에 관련된 꿈 해몽을 확인하세요. 드림디비 AI 꿈 해몽 사전.`}>
-  <div style="max-width:var(--max-width-wide); margin:0 auto; padding:var(--space-8) var(--space-4);">
+<BaseLayout title={`${categoryName} 꿈 해몽 - 드림디비`} description={`${categoryName}에 관련된 꿈 해몽을 확인하세요.`}>
+  <script type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org", "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "홈", "item": baseUrl },
+      { "@type": "ListItem", "position": 2, "name": "카테고리", "item": `${baseUrl}/category` },
+      ...(category ? [{ "@type": "ListItem", "position": 3, "name": categoryName, "item": `${baseUrl}/category/${category.slug}` }] : [])
+    ]
+  })} />
 
-    <!-- Category Nav -->
-    <nav style="display:flex; flex-wrap:wrap; gap:var(--space-2); margin-bottom:var(--space-8); padding-bottom:var(--space-6); border-bottom:1px solid var(--color-border-default);">
-      <a href="/category" class:list={[
-        'category-pill',
-        { 'category-pill-active': !category }
-      ]} style={!category ? 'background:var(--color-dream-primary);color:white;' : ''}>전체</a>
+  <div class="container-wide page-section">
+    <nav class="breadcrumb mb-6" aria-label="Breadcrumb">
+      <a href="/">홈</a><span class="separator">›</span><a href="/category">카테고리</a>
+      {category && (<><span class="separator">›</span><span class="text-secondary">{categoryName}</span></>)}
+    </nav>
+
+    <nav class="category-nav">
+      <a href="/category" class:list={['category-pill', { 'category-nav-active': !category }]}>전체</a>
       {categoryList.map((cat: any) => (
-        <a href={`/category/${cat.slug}`} class="category-pill" style={category?.slug === cat.slug ? 'background:var(--color-dream-primary);color:white;' : ''}>
-          {cat.name} <span style="opacity:0.6; margin-left:2px;">{cat.dream_count}</span>
+        <a href={`/category/${cat.slug}`} class:list={['category-pill', { 'category-nav-active': category?.slug === cat.slug }]}>
+          {cat.name} <span class="category-nav-count">{cat.dream_count}</span>
         </a>
       ))}
     </nav>
 
-    <!-- Header -->
-    <div style="margin-bottom:var(--space-8);">
-      <h1 class="heading-1" style="margin-bottom:var(--space-2);">{categoryName} 꿈 해몽</h1>
-      <p style="font-size:var(--font-size-base); color:var(--color-text-secondary);">
-        {categoryName === '전체 카테고리' ? '모든 카테고리의 꿈 해몽 목록입니다.' : `"${categoryName}" 카테고리의 꿈 해몽 목록입니다.`}
-      </p>
+    <div class="mb-8">
+      <h1 class="heading-1 mb-2">{categoryName} 꿈 해몽</h1>
+      <p class="text-secondary">총 {totalCount.toLocaleString()}개의 해몽</p>
     </div>
 
-    <!-- Dream Grid -->
-    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:var(--space-4);">
+    <div class="dream-grid">
       {dreams.map((dream: any) => (
-        <a href={`/dream/${dream.slug}`} class="card" style="padding:var(--space-5); text-decoration:none; display:flex; flex-direction:column;">
-          <div style="display:flex; align-items:center; gap:var(--space-2); margin-bottom:var(--space-3);">
+        <a href={`/dream/${dream.slug}`} class="card dream-card">
+          <div class="dream-card-meta">
             {dream.category_name && <span class="category-pill">{dream.category_name}</span>}
-            <span style="margin-left:auto; font-size:var(--font-size-xs); color:var(--color-text-tertiary);">👁 {(dream.views || 0).toLocaleString()}</span>
+            <span class="dream-card-views">👁 {(dream.views || 0).toLocaleString()}</span>
           </div>
-          <h3 style="font-family:var(--font-family-display); font-size:var(--font-size-md); font-weight:var(--font-weight-semibold); color:var(--color-text-primary); line-height:var(--line-height-snug); margin-bottom:var(--space-2); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
-            {dream.title}
-          </h3>
-          <p style="font-size:var(--font-size-sm); color:var(--color-text-secondary); line-height:var(--line-height-normal); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; flex:1;">
-            {dream.summary || dream.content?.slice(0, 120)}
-          </p>
+          <h3 class="dream-card-title">{dream.title}</h3>
+          <p class="dream-card-summary">{dream.summary || dream.content?.slice(0, 120)}</p>
         </a>
       ))}
     </div>
+
+    {totalPages > 1 && (
+      <nav class="pagination" aria-label="카테고리 페이지">
+        {page > 1 ? <a href={category ? `/category/${category.slug}?page=${page - 1}` : `/category?page=${page - 1}`}>←</a> : <span class="disabled">←</span>}
+        {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+          const start = page <= 4 ? 1 : Math.max(1, page - 3);
+          const end = Math.min(totalPages, start + 6);
+          if (i + start > end) return null;
+          const p = i + start;
+          const href = category ? `/category/${category.slug}?page=${p}` : `/category?page=${p}`;
+          return p === page ? <span class="active">{p}</span> : <a href={href}>{p}</a>;
+        })}
+        {page < totalPages ? <a href={category ? `/category/${category.slug}?page=${page + 1}` : `/category?page=${page + 1}`}>→</a> : <span class="disabled">→</span>}
+      </nav>
+    )}
   </div>
 </BaseLayout>

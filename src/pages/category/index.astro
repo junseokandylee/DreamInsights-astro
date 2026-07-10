@@ -11,25 +11,24 @@ const categories = await query<any>(`
   HAVING COUNT(*) > 0
   ORDER BY COUNT(*) DESC
 `);
+
+const ICONS: Record<string, string> = {
+  animal: '🐾', nature: '🌿', money: '💰', person: '👤', death: '🪦',
+  food: '🍽️', traffic: '🚗', house: '🏠', marriage: '💍', birth: '👶'
+};
 ---
 
 <BaseLayout title="꿈 해몽 카테고리 - 드림디비" description="동물, 자연, 사람, 돈, 건강 등 카테고리별 꿈 해몽을 확인하세요.">
-  <div style="max-width:var(--max-width-content); margin:0 auto; padding:var(--space-8) var(--space-4);">
-    <h1 class="heading-1" style="margin-bottom:var(--space-3);">카테고리</h1>
-    <p style="color:var(--color-text-secondary); margin-bottom:var(--space-8);">관심 있는 카테고리를 선택해 꿈 해몽을 확인하세요.</p>
+  <div class="max-w-[var(--max-width-content)] mx-auto px-4 page-section">
+    <h1 class="heading-1 mb-3">카테고리</h1>
+    <p class="text-secondary mb-8">관심 있는 카테고리를 선택해 꿈 해몽을 확인하세요.</p>
 
-    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:var(--space-4);">
+    <div class="category-grid">
       {categories.map((cat: any) => (
-        <a href={`/category/${cat.slug}`} class="card" style="padding:var(--space-5); text-decoration:none; text-align:center;">
-          <div style="font-size:24px; margin-bottom:var(--space-2);">
-            {cat.slug === 'animal' ? '🐾' : cat.slug === 'nature' ? '🌿' : cat.slug === 'money' ? '💰' : cat.slug === 'person' ? '👤' : cat.slug === 'death' ? '🪦' : cat.slug === 'food' ? '🍽️' : cat.slug === 'traffic' ? '🚗' : cat.slug === 'house' ? '🏠' : cat.slug === 'marriage' ? '💍' : cat.slug === 'birth' ? '👶' : '🌙'}
-          </div>
-          <h2 style="font-size:var(--font-size-base); font-weight:var(--font-weight-semibold); color:var(--color-text-primary); margin-bottom:var(--space-1);">
-            {cat.name}
-          </h2>
-          <span style="font-size:var(--font-size-xs); color:var(--color-text-tertiary);">
-            {cat.dream_count.toLocaleString()}개 해몽
-          </span>
+        <a href={`/category/${cat.slug}`} class="card category-card">
+          <div class="category-icon">{ICONS[cat.slug] || '🌙'}</div>
+          <h2 class="category-card-name">{cat.name}</h2>
+          <span class="text-xs text-tertiary">{cat.dream_count.toLocaleString()}개 해몽</span>
         </a>
       ))}
     </div>

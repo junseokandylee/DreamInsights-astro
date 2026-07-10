@@ -2,43 +2,10 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { query } from '../lib/db';
 
-// ── Data Fetching (SSR) ──────────────────────
 const [popularDreams, trendingDreams, categories] = await Promise.all([
-  // Popular dreams (most viewed)
-  query<any>(`
-    SELECT d.id, d.original_slug as slug, d.views, d.created_at,
-           t.title, t.summary, t.content,
-           c.name as category_name, c.slug as category_slug
-    FROM dream_interpretations d
-    JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true
-    LEFT JOIN categories c ON d.category_id = c.id
-    WHERE d.is_active = true
-    ORDER BY d.views DESC NULLS LAST
-    LIMIT 8
-  `),
-  // Trending (recent + popular)
-  query<any>(`
-    SELECT d.id, d.original_slug as slug, d.views,
-           t.title, t.summary,
-           c.name as category_name
-    FROM dream_interpretations d
-    JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true
-    LEFT JOIN categories c ON d.category_id = c.id
-    WHERE d.is_active = true AND d.created_at > NOW() - INTERVAL '30 days'
-    ORDER BY d.popularity_score DESC NULLS LAST, d.views DESC NULLS LAST
-    LIMIT 6
-  `),
-  // Categories
-  query<any>(`
-    SELECT c.name, c.slug, COUNT(*) as dream_count
-    FROM categories c
-    JOIN dream_interpretations d ON d.category_id = c.id AND d.is_active = true
-    JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true
-    GROUP BY c.name, c.slug
-    HAVING COUNT(*) > 0
-    ORDER BY COUNT(*) DESC
-    LIMIT 20
-  `)
+  query<any>(`SELECT d.id, d.original_slug as slug, d.views, d.created_at, t.title, t.summary, t.content, c.name as category_name, c.slug as category_slug FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true LEFT JOIN categories c ON d.category_id = c.id WHERE d.is_active = true ORDER BY d.views DESC NULLS LAST LIMIT 8`),
+  query<any>(`SELECT d.id, d.original_slug as slug, d.views, t.title, t.summary, c.name as category_name FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true LEFT JOIN categories c ON d.category_id = c.id WHERE d.is_active = true AND d.created_at > NOW() - INTERVAL '30 days' ORDER BY d.popularity_score DESC NULLS LAST, d.views DESC NULLS LAST LIMIT 6`),
+  query<any>(`SELECT c.name, c.slug, COUNT(*) as dream_count FROM categories c JOIN dream_interpretations d ON d.category_id = c.id AND d.is_active = true JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true GROUP BY c.name, c.slug HAVING COUNT(*) > 0 ORDER BY COUNT(*) DESC LIMIT 20`)
 ]);
 ---
 
@@ -47,84 +14,63 @@ const [popularDreams, trendingDreams, categories] = await Promise.all([
   <!-- ═══ Hero ═══ -->
   <section class="hero" style="padding:var(--space-16) var(--space-4) var(--space-12);">
     <div class="max-w-[640px] mx-auto text-center relative z-10">
-      <p style="font-size:var(--font-size-sm); font-weight:var(--font-weight-medium); color:var(--color-accent); letter-spacing:0.05em; text-transform:uppercase; margin-bottom:var(--space-3);">AI 꿈 해몽 사전</p>
-      <h1 style="font-family:var(--font-family-display); font-size:clamp(32px, 5vw, var(--font-size-4xl)); font-weight:var(--font-weight-bold); color:var(--color-text-on-dark); line-height:var(--line-height-tight); letter-spacing:-0.025em; margin-bottom:var(--space-5);">
-        당신의 꿈이<br>의미하는 바를 알아보세요
-      </h1>
-      <p style="font-size:var(--font-size-lg); color:var(--color-text-on-dark-secondary); line-height:var(--line-height-normal); margin-bottom:var(--space-8); max-width:480px; margin-left:auto; margin-right:auto;">
-        수만 개의 꿈 해몽 데이터로 분석한 결과를 확인하세요.
-      </p>
+      <p class="hero-subtitle">AI 꿈 해몽 사전</p>
+      <h1 class="hero-title">당신의 꿈이<br>의미하는 바를 알아보세요</h1>
+      <p class="hero-desc">수만 개의 꿈 해몽 데이터로 분석한 결과를 확인하세요.</p>
 
-      <!-- Search Bar -->
-      <div style="position:relative; max-width:520px; margin:0 auto;">
-        <svg style="position:absolute; left:var(--space-4); top:50%; transform:translateY(-50%); color:var(--color-text-tertiary);" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <div class="hero-search" style="position:relative; max-width:520px; margin:0 auto;">
+        <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
         <form id="home-search-form" action="/search" method="get">
-          <input
-            type="search"
-            name="q"
-            class="search-input"
-            placeholder="꿈을 검색하세요… (예: 물고기, 이사, 합격)"
-            autocomplete="off"
-            style="padding-left:var(--space-10); height:48px; font-size:var(--font-size-base); background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.12); color:var(--color-text-on-dark); backdrop-filter:blur(8px);"
-          />
-          <input type="text" name="website" value="" tabindex="-1" autocomplete="off" style="position:absolute; left:-9999px; top:-9999px; width:1px; height:1px; opacity:0; pointer-events:none;" aria-hidden="true" />
+          <input type="search" name="q" class="search-input hero-search-input" placeholder="꿈을 검색하세요… (예: 물고기, 이사, 합격)" autocomplete="off" />
+          <input type="text" name="website" value="" tabindex="-1" autocomplete="off" class="honeypot" aria-hidden="true" />
           <input type="hidden" name="_ts" id="home-search-ts" value="" />
         </form>
       </div>
     </div>
   </section>
 
-  <!-- ═══ Popular Dreams (Main Content — SEO focused) ═══ -->
-  <section style="padding:var(--space-12) var(--space-4); max-width:var(--max-width-wide); margin:0 auto;">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:var(--space-6);">
+  <!-- ═══ Popular Dreams ═══ -->
+  <section class="max-w-[var(--max-width-wide)] mx-auto px-4 py-12">
+    <div class="flex items-center justify-between mb-6">
       <h2 class="heading-2">인기 해몽</h2>
-      <a href="/trending" style="font-size:var(--font-size-sm); font-weight:var(--font-weight-medium); color:var(--color-accent); text-decoration:none;">더보기 →</a>
+      <a href="/trending" class="text-sm text-medium" style="color:var(--color-accent); text-decoration:none;">더보기 →</a>
     </div>
-
-    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:var(--space-4);">
+    <div class="dream-grid">
       {popularDreams.map((dream: any) => (
-        <a href={`/dream/${dream.slug}`} class="card" style="padding:var(--space-5); text-decoration:none; display:flex; flex-direction:column;">
-          <div style="display:flex; align-items:center; gap:var(--space-2); margin-bottom:var(--space-3);">
+        <a href={`/dream/${dream.slug}`} class="card dream-card">
+          <div class="dream-card-meta">
             {dream.category_name && <span class="category-pill">{dream.category_name}</span>}
-            <span style="margin-left:auto; font-size:var(--font-size-xs); color:var(--color-text-tertiary);">👁 {(dream.views || 0).toLocaleString()}</span>
+            <span class="dream-card-views">👁 {(dream.views || 0).toLocaleString()}</span>
           </div>
-          <h3 style="font-family:var(--font-family-display); font-size:var(--font-size-md); font-weight:var(--font-weight-semibold); color:var(--color-text-primary); line-height:var(--line-height-snug); margin-bottom:var(--space-2); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
-            {dream.title}
-          </h3>
-          <p style="font-size:var(--font-size-sm); color:var(--color-text-secondary); line-height:var(--line-height-normal); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; flex:1;">
-            {dream.summary || dream.content?.slice(0, 120)}
-          </p>
+          <h3 class="dream-card-title">{dream.title}</h3>
+          <p class="dream-card-summary">{dream.summary || dream.content?.slice(0, 120)}</p>
         </a>
       ))}
     </div>
   </section>
 
-  <!-- ═══ Inline Ad Slot ═══ -->
   <div class="max-w-[var(--max-width-content)] mx-auto px-4">
-    <div class="ad-slot ad-slot-inline">광고 영역</div>
+    <div class="ad-slot ad-inline">광고 영역</div>
   </div>
 
-  <!-- ═══ Trending (Sidebar-style on desktop) ═══ -->
+  <!-- ═══ Trending ═══ -->
   <section style="padding:var(--space-12) var(--space-4); background:var(--color-background-muted);">
     <div class="max-w-[var(--max-width-wide)] mx-auto">
-      <div style="display:flex; align-items:center; gap:var(--space-2); margin-bottom:var(--space-6);">
+      <div class="flex items-center mb-6" style="gap:var(--space-2);">
         <span style="font-size:20px;">🔥</span>
         <h2 class="heading-2" style="margin:0;">최근 인기 해몽</h2>
       </div>
-
       <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:var(--space-4);">
         {trendingDreams.map((dream: any, i: number) => (
-          <a href={`/dream/${dream.slug}`} style="display:flex; gap:var(--space-4); padding:var(--space-4); background:var(--color-background-surface); border-radius:var(--radius-lg); text-decoration:none; border:1px solid var(--color-border-card); transition:box-shadow var(--transition-base);">
-            <span style="font-family:var(--font-family-display); font-size:var(--font-size-2xl); font-weight:var(--font-weight-bold); color:var(--color-dream-primary); min-width:32px; text-align:center; opacity:0.6;">{i + 1}</span>
-            <div style="flex:1; min-width:0;">
-              <h3 style="font-size:var(--font-size-base); font-weight:var(--font-weight-semibold); color:var(--color-text-primary); line-height:var(--line-height-snug); margin-bottom:var(--space-1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                {dream.title}
-              </h3>
-              <div style="display:flex; align-items:center; gap:var(--space-2);">
-                {dream.category_name && <span class="category-pill" style="font-size:11px;">{dream.category_name}</span>}
-                <span style="font-size:var(--font-size-xs); color:var(--color-text-tertiary);">👁 {(dream.views || 0).toLocaleString()}</span>
+          <a href={`/dream/${dream.slug}`} class="trending-list-item">
+            <span class="trending-rank">{i + 1}</span>
+            <div class="trending-item-body">
+              <h3 class="trending-item-title">{dream.title}</h3>
+              <div class="dream-meta-row">
+                {dream.category_name && <span class="category-pill text-xs">{dream.category_name}</span>}
+                <span class="text-xs text-tertiary">👁 {(dream.views || 0).toLocaleString()}</span>
               </div>
             </div>
           </a>
@@ -134,41 +80,29 @@ const [popularDreams, trendingDreams, categories] = await Promise.all([
   </section>
 
   <!-- ═══ Categories ═══ -->
-  <section style="padding:var(--space-12) var(--space-4); max-width:var(--max-width-wide); margin:0 auto;">
-    <h2 class="heading-2" style="text-align:center; margin-bottom:var(--space-8);">꿈 해몽 카테고리</h2>
-
-    <div style="display:flex; flex-wrap:wrap; gap:var(--space-3); justify-content:center;">
+  <section class="max-w-[var(--max-width-wide)] mx-auto px-4 py-12">
+    <h2 class="heading-2 centered-block">꿈 해몽 카테고리</h2>
+    <div class="flex flex-wrap gap-3 justify-center">
       {categories.map((cat: any) => (
-        <a href={`/category/${cat.slug}`} class="category-tag"
-        >
+        <a href={`/category/${cat.slug}`} class="category-tag">
           <span>#{cat.name}</span>
-          <span style="font-size:var(--font-size-xs); color:var(--color-text-tertiary);">{cat.dream_count.toLocaleString()}</span>
+          <span class="text-xs text-tertiary">{cat.dream_count.toLocaleString()}</span>
         </a>
       ))}
     </div>
   </section>
 
-  <!-- ═══ SEO Content Block (below fold) ═══ -->
-  <section style="padding:var(--space-12) var(--space-4); max-width:var(--max-width-content); margin:0 auto;">
-    <article class="body-reading" style="padding:var(--space-8); background:var(--color-background-surface); border-radius:var(--radius-xl); border:1px solid var(--color-border-card);">
-      <h2 style="font-family:var(--font-family-display); font-size:var(--font-size-xl); font-weight:var(--font-weight-bold); margin-bottom:var(--space-4); color:var(--color-text-primary);">
-        드림디비 — 꿈 해몽을 위한 AI 검색 사전
-      </h2>
-      <p style="margin-bottom:var(--space-4);">
-        드림디비는 수만 개의 꿈 해몽 데이터를 AI로 분석하여, 당신이 꾼 꿈의 의미를 쉽고 정확하게 찾아볼 수 있도록 도와주는 서비스입니다. 동물, 자연, 사람, 건강, 금전 등 다양한 카테고리의 꿈 해석을 제공합니다.
-      </p>
-      <p style="margin-bottom:var(--space-4);">
-        전통적인 꿈 해몽과 함께, 현대적인 심리학적 관점에서의 꿈 분석도 함께 제공하여 더 깊이 있는 이해를 돕습니다. 꿈 검색창에 꾼 꿈의 키워드를 입력하시면 관련 해몽을 즉시 확인할 수 있습니다.
-      </p>
-      <p>
-        매일 업데이트되는 인기 해몽과 트렌딩 해몽을 통해 많은 사람들이 궁금해하는 꿈의 의미도 함께 확인해 보세요.
-      </p>
+  <!-- ═══ SEO Content ═══ -->
+  <section class="max-w-[var(--max-width-content)] mx-auto px-4 py-12">
+    <article class="seo-article">
+      <h2 class="seo-article-title">드림디비 — 꿈 해몽을 위한 AI 검색 사전</h2>
+      <p class="mb-4">드림디비는 수만 개의 꿈 해몽 데이터를 AI로 분석하여, 당신이 꾼 꿈의 의미를 쉽고 정확하게 찾아볼 수 있도록 도와주는 서비스입니다. 동물, 자연, 사람, 건강, 금전 등 다양한 카테고리의 꿈 해석을 제공합니다.</p>
+      <p class="mb-4">전통적인 꿈 해몽과 함께, 현대적인 심리학적 관점에서의 꿈 분석도 함께 제공하여 더 깊이 있는 이해를 돕습니다. 꿈 검색창에 꾼 꿈의 키워드를 입력하시면 관련 해몽을 즉시 확인할 수 있습니다.</p>
+      <p>매일 업데이트되는 인기 해몽과 트렌딩 해몽을 통해 많은 사람들이 궁금해하는 꿈의 의미도 함께 확인해 보세요.</p>
     </article>
   </section>
 
   <script is:inline>
-    document.getElementById('home-search-form').addEventListener('submit', () => {
-      document.getElementById('home-search-ts').value = Date.now();
-    });
+    document.getElementById('home-search-form').addEventListener('submit', () => { document.getElementById('home-search-ts').value = Date.now(); });
   </script>
 </BaseLayout>

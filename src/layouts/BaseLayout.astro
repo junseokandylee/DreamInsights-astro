@@ -13,7 +13,8 @@ const { title, description = '당신의 꿈이 의미하는 바를 AI가 분석�
 const baseUrl = 'https://dream-db.net';
 const fullTitle = title === '드림디비 — AI 꿈 해몽' ? title : `${title} | 드림디비`;
 const resolvedOg = ogImage || `${baseUrl}/og-default.png`;
-const resolvedCanonical = canonicalUrl || Astro.url.href;
+const resolvedCanonical = canonicalUrl || `${baseUrl}${Astro.url.pathname}`;
+const year = new Date().getFullYear();
 ---
 
 <!doctype html>
@@ -23,7 +24,6 @@ const resolvedCanonical = canonicalUrl || Astro.url.href;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0A0E27" />
     <meta name="robots" content="index, follow" />
-    <meta name="google-adsense-account" content="" />
 
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
@@ -55,16 +55,16 @@ const resolvedCanonical = canonicalUrl || Astro.url.href;
   </head>
   <body>
     <!-- Header -->
-    <header class="sticky top-0 z-50" style="background:var(--color-background-surface); border-bottom:1px solid var(--color-border-default); box-shadow:var(--shadow-xs);">
-      <div class="max-w-[1200px] mx-auto px-4 flex items-center justify-between" style="height:56px;">
-        <a href="/" class="flex items-center gap-2 no-underline">
-          <span style="font-size:20px;">🌙</span>
-          <span style="font-family:var(--font-family-display); font-weight:700; font-size:18px; color:var(--color-text-primary);">드림디비</span>
+    <header class="site-header">
+      <div class="container flex items-center justify-between">
+        <a href="/" class="site-logo">
+          <span class="logo-icon">🌙</span>
+          <span class="logo-text">드림디비</span>
         </a>
-        <nav class="flex items-center gap-1">
-          <a href="/" class="nav-link" style="padding:8px 12px; font-size:var(--font-size-sm); font-weight:var(--font-weight-medium); color:var(--color-text-secondary); text-decoration:none; border-radius:var(--radius-md); transition:color var(--transition-fast), background var(--transition-fast);">홈</a>
-          <a href="/category" class="nav-link" style="padding:8px 12px; font-size:var(--font-size-sm); font-weight:var(--font-weight-medium); color:var(--color-text-secondary); text-decoration:none; border-radius:var(--radius-md); transition:color var(--transition-fast), background var(--transition-fast);">카테고리</a>
-          <a href="/trending" class="nav-link" style="padding:8px 12px; font-size:var(--font-size-sm); font-weight:var(--font-weight-medium); color:var(--color-text-secondary); text-decoration:none; border-radius:var(--radius-md); transition:color var(--transition-fast), background var(--transition-fast);">인기</a>
+        <nav class="site-nav">
+          <a href="/">홈</a>
+          <a href="/category">카테고리</a>
+          <a href="/trending">인기</a>
         </nav>
       </div>
     </header>
@@ -72,15 +72,15 @@ const resolvedCanonical = canonicalUrl || Astro.url.href;
     <slot />
 
     <!-- Footer -->
-    <footer style="background:var(--color-background-surface); border-top:1px solid var(--color-border-default); margin-top:var(--space-20); padding:var(--space-12) var(--space-4);">
-      <div class="max-w-[1200px] mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-        <div class="flex items-center gap-2">
-          <span style="font-size:16px;">🌙</span>
-          <span style="font-weight:var(--font-weight-semibold); color:var(--color-text-primary);">드림디비</span>
-          <span style="color:var(--color-text-tertiary); font-size:var(--font-size-sm);">AI 꿈 해몽</span>
+    <footer class="site-footer">
+      <div class="container flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="footer-brand">
+          <span class="logo-icon">🌙</span>
+          <span class="footer-brand-name">드림디비</span>
+          <span class="footer-brand-sub">AI 꿈 해몽</span>
         </div>
-        <p style="font-size:var(--font-size-xs); color:var(--color-text-tertiary);">
-          © 2025 드림디비. 모든 꿈 해몽 내용은 참고용이며, 전문적인 상담을 대체하지 않습니다.
+        <p class="footer-copy">
+          © {year} 드림디비. 모든 꿈 해몽 내용은 참고용이며, 전문적인 상담을 대체하지 않습니다.
         </p>
       </div>
     </footer>

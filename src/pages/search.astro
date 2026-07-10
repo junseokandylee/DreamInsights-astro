@@ -7,34 +7,20 @@ export const prerender = false;
 // ── Bot Detection ─────────────────────────────
 const ua = Astro.request.headers.get('user-agent') || '';
 const BOT_PATTERNS = /bot|crawl|spider|slurp|mediapartners|preview|fetch|curl|wget|python|java|httpclient|scrapy|phantom|selenium|headless/i;
+function isLikelyBot(userAgent: string): boolean { return BOT_PATTERNS.test(userAgent); }
 
-function isLikelyBot(userAgent: string): boolean {
-  return BOT_PATTERNS.test(userAgent);
-}
-
-// ── Rate Limiter (in-memory, per-IP) ───────────
+// ── Rate Limiter ───────────────────────────────
 const searchLimiter = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT = 10; // requests per window
-const RATE_WINDOW = 60_000; // 1 minute
-
+const RATE_LIMIT = 10;
+const RATE_WINDOW = 60_000;
 function isRateLimited(ip: string): boolean {
   const now = Date.now();
   const entry = searchLimiter.get(ip);
-  if (!entry || now > entry.resetAt) {
-    searchLimiter.set(ip, { count: 1, resetAt: now + RATE_WINDOW });
-    return false;
-  }
+  if (!entry || now > entry.resetAt) { searchLimiter.set(ip, { count: 1, resetAt: now + RATE_WINDOW }); return false; }
   entry.count++;
   return entry.count > RATE_LIMIT;
 }
-
-// Clean stale entries periodically
-if (searchLimiter.size > 10000) {
-  const now = Date.now();
-  for (const [key, val] of searchLimiter) {
-    if (now > val.resetAt) searchLimiter.delete(key);
-  }
-}
+if (searchLimiter.size > 10000) { const now = Date.now(); for (const [key, val] of searchLimiter) { if (now > val.resetAt) searchLimiter.delete(key); } }
 
 // ── Request Validation ─────────────────────────
 const q = Astro.url.searchParams.get('q') || '';
@@ -42,141 +28,109 @@ const decodedQ = decodeURIComponent(q);
 const honeypot = Astro.url.searchParams.get('website') || '';
 const clientCheck = Astro.url.searchParams.get('_ts') || '';
 const clientIp = Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-  || Astro.request.headers.get('cf-connecting-ip')
-  || 'unknown';
+  || Astro.request.headers.get('cf-connecting-ip') || 'unknown';
+const page = Math.max(1, parseInt(Astro.url.searchParams.get('page') || '1', 10) || 1);
+const PER_PAGE = 24;
 
 let blocked = false;
-let blockReason = '';
-
-// 1) Honeypot: hidden field that bots auto-fill
-if (honeypot.length > 0) {
-  blocked = true;
-  blockReason = 'honeypot';
-}
-
-// 2) Client-side JS timestamp check (bots often skip JS)
+if (honeypot.length > 0) blocked = true;
 if (!blocked && decodedQ.trim().length >= 2) {
   const ts = parseInt(clientCheck, 10);
   const now = Date.now();
-  // _ts is set by JS on form submit. If missing or too far in past/future → bot
-  if (!clientCheck || isNaN(ts) || ts < now - 300000 || ts > now + 60000) {
-    blocked = true;
-    blockReason = 'timestamp';
-  }
+  if (!clientCheck || isNaN(ts) || ts < now - 300000 || ts > now + 60000) blocked = true;
 }
+if (!blocked && isRateLimited(clientIp)) blocked = true;
+if (!blocked && isLikelyBot(ua)) blocked = true;
 
-// 3) Rate limiting
-if (!blocked && isRateLimited(clientIp)) {
-  blocked = true;
-  blockReason = 'rate';
-}
-
-// 4) Bot UA filter
-if (!blocked && isLikelyBot(ua)) {
-  blocked = true;
-  blockReason = 'bot';
-}
-
-// ── Search Execution (only if not blocked) ─────
+// ── Search Execution ──────────────────────────
 let dreams: any[] = [];
 let totalCount = 0;
+let totalPages = 1;
 
 if (decodedQ.trim() && !blocked) {
   const searchTerm = `%${decodedQ.trim()}%`;
+  const offset = (page - 1) * PER_PAGE;
   const [results, count] = await Promise.all([
-    query<any>(`
-      SELECT d.id, d.original_slug as slug, d.views,
-             t.title, t.summary, t.content,
-             c.name as category_name, c.slug as category_slug
-      FROM dream_interpretations d
-      JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true
-      LEFT JOIN categories c ON d.category_id = c.id
-      WHERE d.is_active = true
-        AND (t.title ILIKE $1 OR t.content ILIKE $1 OR t.summary ILIKE $1 OR d.original_slug ILIKE $1)
-      ORDER BY d.views DESC NULLS LAST
-      LIMIT 24
-    `, [searchTerm]),
-    query<any>(`
-      SELECT COUNT(*) as total
-      FROM dream_interpretations d
-      JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true
-      WHERE d.is_active = true
-        AND (t.title ILIKE $1 OR t.content ILIKE $1 OR t.summary ILIKE $1 OR d.original_slug ILIKE $1)
-    `, [searchTerm])
+    query<any>(`SELECT d.id, d.original_slug as slug, d.views, t.title, t.summary, t.content, c.name as category_name, c.slug as category_slug FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true LEFT JOIN categories c ON d.category_id = c.id WHERE d.is_active = true AND (t.title ILIKE $1 OR t.content ILIKE $1 OR t.summary ILIKE $1 OR d.original_slug ILIKE $1) ORDER BY d.views DESC NULLS LAST LIMIT $2 OFFSET $3`, [searchTerm, PER_PAGE, offset]),
+    query<any>(`SELECT COUNT(*) as total FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true WHERE d.is_active = true AND (t.title ILIKE $1 OR t.content ILIKE $1 OR t.summary ILIKE $1 OR d.original_slug ILIKE $1)`, [searchTerm])
   ]);
   dreams = results;
   totalCount = count[0]?.total || 0;
+  totalPages = Math.ceil(totalCount / PER_PAGE);
 }
 ---
 
 <BaseLayout title={decodedQ ? `"${decodedQ}" 꿈 해몽 검색 - 드림디비` : '꿈 검색 - 드림디비'} description={decodedQ ? `"${decodedQ}"에 대한 꿈 해몽 검색 결과입니다.` : '꿈 해몽을 검색하세요.'}>
-  <div style="max-width:var(--max-width-wide); margin:0 auto; padding:var(--space-8) var(--space-4);">
+  <div class="container-wide page-section">
 
-    <!-- Search Bar -->
-    <form id="search-form" action="/search" method="get" style="max-width:600px; margin:0 auto var(--space-10);">
+    <form id="search-form" action="/search" method="get" class="search-form">
       <div style="position:relative;">
-        <svg style="position:absolute; left:var(--space-4); top:50%; transform:translateY(-50%); color:var(--color-text-tertiary);" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
         <input type="search" name="q" class="search-input" value={decodedQ} placeholder="꿈을 검색하세요… (예: 물고기, 이사, 합격)" autocomplete="off" autofocus={!!decodedQ} />
-        <!-- Honeypot: invisible to humans, bots auto-fill -->
-        <input type="text" name="website" value="" tabindex="-1" autocomplete="off" style="position:absolute; left:-9999px; top:-9999px; width:1px; height:1px; opacity:0; pointer-events:none;" aria-hidden="true" />
-        <!-- Client timestamp: set by JS on submit -->
+        <input type="text" name="website" value="" tabindex="-1" autocomplete="off" class="honeypot" aria-hidden="true" />
         <input type="hidden" name="_ts" id="search-ts" value="" />
       </div>
     </form>
 
     {blocked ? (
-      <div style="text-align:center; padding:var(--space-16) var(--space-4);">
-        <p style="font-size:var(--font-size-xl); color:var(--color-text-primary); font-weight:var(--font-weight-semibold); margin-bottom:var(--space-4);">🤖 잠시만 기다려주세요</p>
-        <p style="color:var(--color-text-secondary); max-width:400px; margin:0 auto;">자동화된 요청이 감지되어 검색이 일시적으로 제한되었습니다. 잠시 후 다시 시도해 주세요.</p>
+      <div class="empty-state">
+        <p class="empty-state-title">🤖 잠시만 기다려주세요</p>
+        <p class="empty-state-desc" style="max-width:400px; margin:0 auto;">자동화된 요청이 감지되어 검색이 일시적으로 제한되었습니다.</p>
       </div>
     ) : decodedQ.trim() ? (
       <div>
-        <!-- Result Header -->
-        <div style="margin-bottom:var(--space-6);">
-          <p style="font-size:var(--font-size-sm); color:var(--color-text-tertiary);">
-            "<span style="color:var(--color-text-primary); font-weight:var(--font-weight-medium);">{decodedQ}</span>" 검색 결과
-            <span style="margin-left:var(--space-2); color:var(--color-accent);">{totalCount.toLocaleString()}개</span>
-          </p>
-        </div>
+        <h1 class="text-sm text-tertiary mb-6" style="font-weight:var(--font-weight-normal);">
+          "<span class="text-medium" style="color:var(--color-text-primary);">{decodedQ}</span>" 검색 결과
+          <span class="text-accent" style="margin-left:var(--space-2);">{totalCount.toLocaleString()}개</span>
+        </h1>
 
         {dreams.length > 0 ? (
-          <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:var(--space-4);">
-            {dreams.map((dream: any) => (
-              <a href={`/dream/${dream.slug}`} class="card" style="padding:var(--space-5); text-decoration:none; display:flex; flex-direction:column;">
-                <div style="display:flex; align-items:center; gap:var(--space-2); margin-bottom:var(--space-3);">
-                  {dream.category_name && <span class="category-pill">{dream.category_name}</span>}
-                  <span style="margin-left:auto; font-size:var(--font-size-xs); color:var(--color-text-tertiary);">👁 {(dream.views || 0).toLocaleString()}</span>
-                </div>
-                <h3 style="font-family:var(--font-family-display); font-size:var(--font-size-md); font-weight:var(--font-weight-semibold); color:var(--color-text-primary); line-height:var(--line-height-snug); margin-bottom:var(--space-2); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
-                  {dream.title}
-                </h3>
-                <p style="font-size:var(--font-size-sm); color:var(--color-text-secondary); line-height:var(--line-height-normal); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; flex:1;">
-                  {dream.summary || dream.content?.slice(0, 120)}
-                </p>
-              </a>
-            ))}
-          </div>
+          <>
+            <div class="dream-grid">
+              {dreams.map((dream: any) => (
+                <a href={`/dream/${dream.slug}`} class="card dream-card">
+                  <div class="dream-card-meta">
+                    {dream.category_name && <span class="category-pill">{dream.category_name}</span>}
+                    <span class="dream-card-views">👁 {(dream.views || 0).toLocaleString()}</span>
+                  </div>
+                  <h3 class="dream-card-title">{dream.title}</h3>
+                  <p class="dream-card-summary">{dream.summary || dream.content?.slice(0, 120)}</p>
+                </a>
+              ))}
+            </div>
+
+            {totalPages > 1 && (
+              <nav class="pagination" aria-label="검색 결과 페이지">
+                {page > 1 ? <a href={`/search?q=${q}&_ts=0&page=${page - 1}`}>←</a> : <span class="disabled">←</span>}
+                {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                  const start = page <= 4 ? 1 : Math.max(1, page - 3);
+                  const end = Math.min(totalPages, start + 6);
+                  if (i + start > end) return null;
+                  const p = i + start;
+                  return p === page ? <span class="active">{p}</span> : <a href={`/search?q=${q}&_ts=0&page=${p}`}>{p}</a>;
+                })}
+                {page < totalPages ? <a href={`/search?q=${q}&_ts=0&page=${page + 1}`}>→</a> : <span class="disabled">→</span>}
+              </nav>
+            )}
+          </>
         ) : (
-          <div style="text-align:center; padding:var(--space-16) var(--space-4);">
-            <p style="font-size:var(--font-size-lg); color:var(--color-text-primary); font-weight:var(--font-weight-medium); margin-bottom:var(--space-2);">검색 결과가 없습니다</p>
-            <p style="color:var(--color-text-secondary);">다른 키워드로 검색해 보세요.</p>
+          <div class="empty-state">
+            <p class="empty-state-title">검색 결과가 없습니다</p>
+            <p class="empty-state-desc">다른 키워드로 검색해 보세요.</p>
           </div>
         )}
       </div>
     ) : (
-      <div style="text-align:center; padding:var(--space-16) var(--space-4);">
-        <p style="font-size:var(--font-size-xl); color:var(--color-text-primary); font-weight:var(--font-weight-semibold); margin-bottom:var(--space-4);">🔍 검색어를 입력하세요</p>
-        <p style="color:var(--color-text-secondary); margin-bottom:var(--space-8);">꾸신 꿈의 키워드를 입력하면 관련 해몽을 찾아드립니다.</p>
+      <div class="empty-state">
+        <h1 class="empty-state-title">🔍 검색어를 입력하세요</h1>
+        <p class="empty-state-desc" style="margin-bottom:var(--space-8);">꾸신 꿈의 키워드를 입력하면 관련 해몽을 찾아드립니다.</p>
       </div>
     )}
   </div>
 
-  <!-- Client-side: set timestamp on form submit -->
   <script is:inline>
-    document.getElementById('search-form').addEventListener('submit', () => {
-      document.getElementById('search-ts').value = Date.now();
-    });
+    document.getElementById('search-form').addEventListener('submit', () => { document.getElementById('search-ts').value = Date.now(); });
   </script>
 </BaseLayout>
