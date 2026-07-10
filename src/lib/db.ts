@@ -1,29 +1,33 @@
-/**
- * Astro-specific database wrapper
- * Directly connects to PostgreSQL without going through DreamInsights shared code.
- * Avoids Vite symlink resolution issues with @/ path aliases.
- */
-import { Pool } from 'pg';
-import dotenv from 'dotenv';
+import postgres from 'postgres';
 
-dotenv.config();
+let sql: ReturnType<typeof postgres> | null = null;
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
-  statement_timeout: 5000,
-});
-
-export async function query<T = any>(sql: string, params?: any[]): Promise<T[]> {
-  const result = await pool.query(sql, params);
-  return result.rows as T[];
+try {
+  if (process.env.DATABASE_URL) {
+    sql = postgres(process.env.DATABASE_URL, {
+      max: 10,
+      idle_timeout: 30,
+      connect_timeout: 5,
+      statement_timeout: 5000,
+    });
+  }
+} catch (e) {
+  console.error('DB init failed:', e);
 }
 
-export async function queryOne<T = any>(sql: string, params?: any[]): Promise<T | null> {
-  const result = await pool.query(sql, params);
-  return (result.rows[0] as T) || null;
+export async function query<T = any>(text: string, params?: any[]): Promise<T[]> {
+  if (!sql) return [];
+  try {
+    return await sql.unsafe<T>(text, params as any[]);
+  } catch (e) {
+    console.error('DB query error:', e);
+    return [];
+  }
 }
 
-export default pool;
+export async function queryOne<T = any>(text: string, params?: any[]): Promise<T | null> {
+  const rows = await query<T>(text, params);
+  return rows[0] ?? null;
+}
+
+export default sql;

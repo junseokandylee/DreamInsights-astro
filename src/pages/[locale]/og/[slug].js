@@ -1,24 +1,10 @@
 import { query } from '../../../lib/db.js';
-import { Resvg } from '@resvg/resvg-js';
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { SEO_CONFIG, isValidLocale } from '../../../../shared/lib/i18n/config';
 
 export const prerender = false;
 
 const WIDTH = 1200;
 const HEIGHT = 630;
-let fontData = null;
-
-async function getFont() {
-  if (fontData) return fontData;
-  try {
-    fontData = await readFile(join(process.cwd(), 'src', 'fonts', 'NotoSansKR[wght].ttf'));
-  } catch {
-    fontData = null;
-  }
-  return fontData;
-}
 
 function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -43,7 +29,7 @@ export async function GET({ params }) {
   if (!slug) return new Response('Missing slug', { status: 400 });
 
   try {
-    const result = await query(`
+    const rows = await query(`
       SELECT d.original_slug as slug, t.title, c.name as category_name
       FROM dream_interpretations d
       JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = $1 AND t.is_active = true
@@ -51,11 +37,10 @@ export async function GET({ params }) {
       WHERE d.original_slug = $2
     `, [locale, slug]);
 
-    const dream = result.rows?.[0];
+    const dream = rows?.[0];
     const siteName = SEO_CONFIG[locale].siteName;
     const title = dream?.title || slug.replace(/-/g, ' ');
     const category = dream?.category_name || '';
-    const font = await getFont();
 
     const lines = wrapText(title, 22);
     const textY = 280 + (lines.length === 1 ? 30 : 0);
@@ -83,16 +68,10 @@ export async function GET({ params }) {
   <text x="${WIDTH - 120}" y="${HEIGHT - 40}" font-family="'Noto Sans KR'" font-size="16" fill="rgba(255,255,255,0.5)" text-anchor="end">dream-db.net</text>
 </svg>`;
 
-    const opts = { fitTo: { mode: 'width', value: WIDTH } };
-    if (font) Object.assign(opts, { font: { fontData: Array.from(font) } });
-
-    const resvg = new Resvg(svg, opts);
-    const pngData = resvg.render().asPng();
-
-    return new Response(pngData, {
+    return new Response(svg, {
       status: 200,
       headers: {
-        'Content-Type': 'image/png',
+        'Content-Type': 'image/svg+xml',
         'Cache-Control': 'public, max-age=86400, s-maxage=604800',
       },
     });
