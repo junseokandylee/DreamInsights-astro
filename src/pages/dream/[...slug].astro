@@ -220,6 +220,19 @@ const ogDescription = dream.meta_description || dream.summary || mainContent.sli
     }
   ])} />
 
+  <script type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [{
+      "@type": "Question",
+      "name": dream.title,
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": (dream.summary || mainContent || dream.content || '').slice(0, 1000)
+      }
+    }]
+  })} />
+
   <script is:inline>
     const bar = document.getElementById('reading-progress');
     window.addEventListener('scroll', () => {
