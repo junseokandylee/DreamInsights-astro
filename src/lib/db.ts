@@ -13,6 +13,7 @@ const pool = new Pool({
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
+  statement_timeout: 5000,
 });
 
 export async function query<T = any>(sql: string, params?: any[]): Promise<T[]> {

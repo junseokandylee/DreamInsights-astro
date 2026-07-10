@@ -19,6 +19,24 @@ const ICONS: Record<string, string> = {
 ---
 
 <BaseLayout title="꿈 해몽 카테고리 - 드림디비" description="동물, 자연, 사람, 돈, 건강 등 카테고리별 꿈 해몽을 확인하세요.">
+  <script type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": "꿈 해몽 카테고리",
+    "description": "동물, 자연, 사람, 돈, 건강 등 카테고리별 꿈 해몽",
+    "url": "https://dream-db.net/category",
+    "mainEntity": {
+      "@type": "ItemList",
+      "numberOfItems": categories.length,
+      "itemListElement": categories.map((cat: any, i: number) => ({
+        "@type": "ListItem",
+        "position": i + 1,
+        "name": cat.name,
+        "url": `https://dream-db.net/category/${cat.slug}`
+      }))
+    }
+  })} />
+
   <main id="main-content" class="max-w-[var(--max-width-content)] mx-auto px-4 page-section">
     <h1 class="heading-1 mb-3">카테고리</h1>
     <p class="text-secondary mb-8">관심 있는 카테고리를 선택해 꿈 해몽을 확인하세요.</p>
@@ -26,7 +44,7 @@ const ICONS: Record<string, string> = {
     <div class="category-grid">
       {categories.map((cat: any) => (
         <a href={`/category/${cat.slug}`} class="card category-card">
-          <div class="category-icon">{ICONS[cat.slug] || '🌙'}</div>
+          <div class="category-icon"><span aria-hidden="true">{ICONS[cat.slug] || '🌙'}</span></div>
           <h2 class="category-card-name">{cat.name}</h2>
           <span class="text-xs text-tertiary">{cat.dream_count.toLocaleString()}개 해몽</span>
         </a>

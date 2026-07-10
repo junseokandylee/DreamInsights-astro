@@ -979,6 +979,9 @@ a, button, input {
 .search-result-title { font-weight: var(--font-weight-normal); }
 .search-result-query { color: var(--color-text-primary); }
 .trending-rank-num { opacity: 0.5; font-family: var(--font-family-display); }
+.trending-tab { padding: var(--space-3) var(--space-5); font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); color: var(--color-text-secondary); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: color 0.15s, border-color 0.15s; }
+.trending-tab:hover { color: var(--color-accent); }
+.trending-tab-active { color: var(--color-accent) !important; border-bottom-color: var(--color-accent) !important; }
 .tab-panel-hidden { display: none; }
 
 /* ── 404 Error Page ────────────────────────── */

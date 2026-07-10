@@ -8,9 +8,27 @@ const [popularRecent, popularAllTime] = await Promise.all([
   query<any>(`SELECT d.id, d.original_slug as slug, d.views, t.title, t.summary, c.name as category_name FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true LEFT JOIN categories c ON d.category_id = c.id WHERE d.is_active = true AND d.created_at > NOW() - INTERVAL '30 days' ORDER BY d.views DESC NULLS LAST LIMIT 12`),
   query<any>(`SELECT d.id, d.original_slug as slug, d.views, t.title, t.summary, c.name as category_name FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true LEFT JOIN categories c ON d.category_id = c.id WHERE d.is_active = true ORDER BY d.views DESC NULLS LAST LIMIT 12`)
 ]);
+const baseUrl = 'https://dream-db.net';
 ---
 
 <BaseLayout title="인기 꿈 해몽 - 드림디비" description="가장 많이 조회된 꿈 해몽과 최근 30일 인기 해몽을 확인하세요.">
+  <script type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": "인기 꿈 해몽",
+    "description": "가장 많이 조회된 꿈 해몽과 최근 30일 인기 해몽",
+    "url": `${baseUrl}/trending`,
+    "mainEntity": {
+      "@type": "ItemList",
+      "numberOfItems": popularRecent.length,
+      "itemListElement": popularRecent.map((d: any, i: number) => ({
+        "@type": "ListItem",
+        "position": i + 1,
+        "name": d.title,
+        "url": `${baseUrl}/dream/${d.slug}`
+      }))
+    }
+  })} />
   <main id="main-content" class="container-wide page-section">
     <h1 class="heading-1 mb-8">인기 꿈 해몽</h1>
 
@@ -51,18 +69,12 @@ const [popularRecent, popularAllTime] = await Promise.all([
   <script is:inline>
     document.querySelectorAll('.trending-tab').forEach(tab => {
       tab.addEventListener('click', () => {
-        document.querySelectorAll('.trending-tab').forEach(t => {
-          t.style.borderBottom = '2px solid transparent';
-          t.style.color = 'var(--color-text-secondary)';
-          t.classList.remove('trending-tab-active');
-        });
-        tab.style.borderBottom = '2px solid var(--color-accent)';
-        tab.style.color = 'var(--color-accent)';
+        document.querySelectorAll('.trending-tab').forEach(t => t.classList.remove('trending-tab-active'));
         tab.classList.add('trending-tab-active');
         const target = tab.dataset.target;
         document.querySelectorAll('#tab-recent, #tab-alltime').forEach(panel => {
           panel.style.display = panel.id === 'tab-' + target ? 'grid' : 'none';
-        panel.classList.toggle('tab-panel-hidden', panel.id !== 'tab-' + target);
+          panel.classList.toggle('tab-panel-hidden', panel.id !== 'tab-' + target);
         });
       });
     });

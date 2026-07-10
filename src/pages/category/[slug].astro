@@ -35,7 +35,12 @@ const totalPages = Math.ceil(totalCount / PER_PAGE);
 const baseUrl = 'https://dream-db.net';
 ---
 
-<BaseLayout title={`${categoryName} 꿈 해몽 - 드림디비`} description={`${categoryName}에 관련된 꿈 해몽을 확인하세요.`}>
+<BaseLayout title={`${categoryName} 꿈 해몽 - 드림디비`} description={`${categoryName}에 관련된 꿈 해몽을 확인하세요. ${totalCount > 0 ? `총 ${totalCount.toLocaleString()}개의 해몽이 있습니다.` : ''}`}>
+  {totalPages > 1 && (
+    <link rel="canonical" href={`https://dream-db.net/category/${category?.slug || ''}?page=${page}`} />
+  )}
+  {page > 1 && <link rel="prev" href={`https://dream-db.net/category/${category?.slug || ''}?page=${page - 1}`} />}
+  {page < totalPages && <link rel="next" href={`https://dream-db.net/category/${category?.slug || ''}?page=${page + 1}`} />}
   <script type="application/ld+json" set:html={JSON.stringify({
     "@context": "https://schema.org", "@type": "BreadcrumbList",
     "itemListElement": [
