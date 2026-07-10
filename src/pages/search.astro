@@ -51,8 +51,8 @@ if (decodedQ.trim() && !blocked) {
   const searchTerm = `%${decodedQ.trim()}%`;
   const offset = (page - 1) * PER_PAGE;
   const [results, count] = await Promise.all([
-    query<any>(`SELECT d.id, d.original_slug as slug, d.views, t.title, t.summary, t.content, c.name as category_name, c.slug as category_slug FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true LEFT JOIN categories c ON d.category_id = c.id WHERE d.is_active = true AND (t.title ILIKE $1 OR t.content ILIKE $1 OR t.summary ILIKE $1 OR d.original_slug ILIKE $1) ORDER BY d.views DESC NULLS LAST LIMIT $2 OFFSET $3`, [searchTerm, PER_PAGE, offset]),
-    query<any>(`SELECT COUNT(*) as total FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true WHERE d.is_active = true AND (t.title ILIKE $1 OR t.content ILIKE $1 OR t.summary ILIKE $1 OR d.original_slug ILIKE $1)`, [searchTerm])
+    query<any>(`SELECT d.id, d.original_slug as slug, d.views, t.title, t.summary, t.content, c.name as category_name, c.slug as category_slug FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = 1 LEFT JOIN categories c ON d.category_id = c.id WHERE d.is_active = 1 AND (t.title LIKE ? OR t.content LIKE ? OR t.summary LIKE ? OR d.original_slug LIKE ?) ORDER BY d.views DESC LIMIT ? OFFSET ?`, [searchTerm, searchTerm, searchTerm, searchTerm, PER_PAGE, offset]),
+    query<any>(`SELECT COUNT(*) as total FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = 1 WHERE d.is_active = 1 AND (t.title LIKE ? OR t.content LIKE ? OR t.summary LIKE ? OR d.original_slug LIKE ?)`, [searchTerm, searchTerm, searchTerm, searchTerm])
   ]);
   dreams = results;
   totalCount = count[0]?.total || 0;

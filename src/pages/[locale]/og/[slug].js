@@ -32,9 +32,9 @@ export async function GET({ params }) {
     const rows = await query(`
       SELECT d.original_slug as slug, t.title, c.name as category_name
       FROM dream_interpretations d
-      JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = $1 AND t.is_active = true
+      JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = ? AND t.is_active = 1
       LEFT JOIN categories c ON d.category_id = c.id
-      WHERE d.original_slug = $2
+      WHERE d.original_slug = ?
     `, [locale, slug]);
 
     const dream = rows?.[0];

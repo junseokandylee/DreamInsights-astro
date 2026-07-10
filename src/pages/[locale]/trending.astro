@@ -15,8 +15,8 @@ const { locale } = Astro.params as { locale: Locale };
 const seoConfig = SEO_CONFIG[locale];
 
 const [popularRecent, popularAllTime] = await Promise.all([
-  query<any>(`SELECT d.id, d.original_slug as slug, d.views, t.title, t.summary, c.name as category_name FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = $1 AND t.is_active = true LEFT JOIN categories c ON d.category_id = c.id WHERE d.is_active = true AND d.created_at > NOW() - INTERVAL '30 days' ORDER BY d.views DESC NULLS LAST LIMIT 12`, [locale]),
-  query<any>(`SELECT d.id, d.original_slug as slug, d.views, t.title, t.summary, c.name as category_name FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = $1 AND t.is_active = true LEFT JOIN categories c ON d.category_id = c.id WHERE d.is_active = true ORDER BY d.views DESC NULLS LAST LIMIT 12`, [locale])
+  query<any>(`SELECT d.id, d.original_slug as slug, d.views, t.title, t.summary, c.name as category_name FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = ? AND t.is_active = 1 LEFT JOIN categories c ON d.category_id = c.id WHERE d.is_active = 1 AND d.created_at > datetime('now', '-30 days') ORDER BY d.views DESC LIMIT 12`, [locale]),
+  query<any>(`SELECT d.id, d.original_slug as slug, d.views, t.title, t.summary, c.name as category_name FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = ? AND t.is_active = 1 LEFT JOIN categories c ON d.category_id = c.id WHERE d.is_active = 1 ORDER BY d.views DESC LIMIT 12`, [locale])
 ]);
 ---
 

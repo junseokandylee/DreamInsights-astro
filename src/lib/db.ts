@@ -1,33 +1,75 @@
-import postgres from 'postgres';
+// D1 (Cloudflare SQLite) database client for CF Pages Workers
+// Uses import { env } from 'cloudflare:workers' which wrangler resolves at deploy time
+// Falls back to empty results when D1 binding is unavailable (local dev)
 
-let sql: ReturnType<typeof postgres> | null = null;
+import { env } from 'cloudflare:workers';
 
-try {
-  if (process.env.DATABASE_URL) {
-    sql = postgres(process.env.DATABASE_URL, {
-      max: 10,
-      idle_timeout: 30,
-      connect_timeout: 5,
-      statement_timeout: 5000,
-    });
-  }
-} catch (e) {
-  console.error('DB init failed:', e);
+interface D1Result<T = Record<string, unknown>> {
+  results: T[];
+  success: boolean;
+  meta?: { duration: number; changes: number; last_row_id: number };
 }
 
-export async function query<T = any>(text: string, params?: any[]): Promise<T[]> {
-  if (!sql) return [];
+type D1Database = {
+  prepare(sql: string): {
+    bind(...params: unknown[]): Promise<D1Result>;
+    all(): Promise<D1Result>;
+    run(): Promise<D1Result>;
+    first<T = Record<string, unknown>>(colName?: string): Promise<T | null>;
+  };
+};
+
+function getDB(): D1Database | undefined {
   try {
-    return await sql.unsafe<T>(text, params as any[]);
+    const db = (env as any).DB;
+    if (db) return db as D1Database;
+  } catch {}
+  return undefined;
+}
+
+export async function query<T = Record<string, unknown>>(
+  sql: string,
+  params: unknown[] = []
+): Promise<T[]> {
+  const db = getDB();
+  if (!db) return [];
+
+  try {
+    const stmt = db.prepare(sql);
+    const result = params.length > 0 ? await stmt.bind(...params).all<T>() : await stmt.all<T>();
+    return result.results ?? [];
   } catch (e) {
-    console.error('DB query error:', e);
+    console.error('D1 query error:', e);
     return [];
   }
 }
 
-export async function queryOne<T = any>(text: string, params?: any[]): Promise<T | null> {
-  const rows = await query<T>(text, params);
-  return rows[0] ?? null;
+export async function queryOne<T = Record<string, unknown>>(
+  sql: string,
+  params: unknown[] = []
+): Promise<T | null> {
+  const db = getDB();
+  if (!db) return null;
+
+  try {
+    const stmt = db.prepare(sql);
+    const result = params.length > 0 ? await stmt.bind(...params).first<T>() : await stmt.first<T>();
+    return result ?? null;
+  } catch (e) {
+    console.error('D1 queryOne error:', e);
+    return null;
+  }
 }
 
-export default sql;
+export async function run(sql: string, params: unknown[] = []): Promise<void> {
+  const db = getDB();
+  if (!db) return;
+
+  try {
+    const stmt = db.prepare(sql);
+    if (params.length > 0) await stmt.bind(...params).run();
+    else await stmt.run();
+  } catch (e) {
+    console.error('D1 run error:', e);
+  }
+}

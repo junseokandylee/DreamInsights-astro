@@ -1,3 +1,8 @@
 name = "dream-db"
 compatibility_date = "2024-12-01"
 compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "dream-db"
+database_id = "7978c74b-65e0-4ca1-b18d-a857aea86132"

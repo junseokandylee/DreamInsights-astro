@@ -12,8 +12,8 @@ echo "📦 Preparing deployment..."
 mkdir -p "$DEPLOY_DIR"
 cp -r dist/client/* "$DEPLOY_DIR/"
 cp dist/server/entry.mjs "$DEPLOY_DIR/_worker.js"
-cp -r dist/server/chunks "$DEPLOY_DIR/"
+cp -r dist/server/chunks "$DEPLOY_DIR/" 2>/dev/null || true
 cp dist/server/virtual_astro_middleware.mjs "$DEPLOY_DIR/" 2>/dev/null || true
 
 echo "🚀 Deploying to CF Pages..."
-npx wrangler pages deploy "$DEPLOY_DIR" --project-name="$PROJECT_NAME" --commit-dirty=true
+npx wrangler pages deploy "$DEPLOY_DIR" --project-name="$PROJECT_NAME" --branch main --commit-dirty=true

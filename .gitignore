@@ -4,3 +4,6 @@ dist/
 .astro/
 *.log
 src/fonts/
+
+.wrangler/
+

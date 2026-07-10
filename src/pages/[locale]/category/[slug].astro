@@ -23,21 +23,21 @@ let category = null;
 let categoryName = t(locale, 'nav.categories');
 const categoryList = await query<any>(`
   SELECT name, slug, COUNT(*) as dream_count FROM categories c
-  JOIN dream_interpretations d ON d.category_id = c.id AND d.is_active = true
-  JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = $1 AND t.is_active = true
+  JOIN dream_interpretations d ON d.category_id = c.id AND d.is_active = 1
+  JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = ? AND t.is_active = 1
   GROUP BY c.name, c.slug HAVING COUNT(*) > 0 ORDER BY COUNT(*) DESC
 `, [locale]);
 
 if (slug && slug !== 'all') {
-  const cats = await query<any>(`SELECT name, slug FROM categories WHERE slug = $1`, [decodedSlug]);
+  const cats = await query<any>(`SELECT name, slug FROM categories WHERE slug = ?`, [decodedSlug]);
   category = cats[0];
   categoryName = category?.name || decodedSlug;
 }
 
 const offset = (page - 1) * PER_PAGE;
 const [dreams, countResult] = await Promise.all([
-  query<any>(`SELECT d.id, d.original_slug as slug, d.views, t.title, t.summary, t.content, c.name as category_name, c.slug as category_slug FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = $1 AND t.is_active = true LEFT JOIN categories c ON d.category_id = c.id ${category ? `WHERE d.category_id = (SELECT id FROM categories WHERE slug = $2)` : 'WHERE 1=1'} AND d.is_active = true ORDER BY d.views DESC NULLS LAST LIMIT ${PER_PAGE} OFFSET ${offset}`, category ? [locale, decodedSlug] : [locale]),
-  query<any>(`SELECT COUNT(*) as total FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = $1 AND t.is_active = true ${category ? `WHERE d.category_id = (SELECT id FROM categories WHERE slug = $2)` : 'WHERE 1=1'} AND d.is_active = true`, category ? [locale, decodedSlug] : [locale])
+  query<any>(`SELECT d.id, d.original_slug as slug, d.views, t.title, t.summary, t.content, c.name as category_name, c.slug as category_slug FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = ? AND t.is_active = 1 LEFT JOIN categories c ON d.category_id = c.id ${category ? `WHERE d.category_id = (SELECT id FROM categories WHERE slug = ?)` : 'WHERE 1=1'} AND d.is_active = 1 ORDER BY d.views DESC LIMIT ${PER_PAGE} OFFSET ${offset}`, category ? [locale, decodedSlug] : [locale]),
+  query<any>(`SELECT COUNT(*) as total FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = ? AND t.is_active = 1 ${category ? `WHERE d.category_id = (SELECT id FROM categories WHERE slug = ?)` : 'WHERE 1=1'} AND d.is_active = 1`, category ? [locale, decodedSlug] : [locale])
 ]);
 
 const totalCount = countResult[0]?.total || 0;
