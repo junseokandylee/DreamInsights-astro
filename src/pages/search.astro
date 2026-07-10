@@ -61,10 +61,10 @@ if (decodedQ.trim() && !blocked) {
 ---
 
 <BaseLayout title={decodedQ ? `"${decodedQ}" 꿈 해몽 검색 - 드림디비` : '꿈 검색 - 드림디비'} description={decodedQ ? `"${decodedQ}"에 대한 꿈 해몽 검색 결과입니다.` : '꿈 해몽을 검색하세요.'}>
-  <div class="container-wide page-section">
+  <main id="main-content" class="container-wide page-section">
 
     <form id="search-form" action="/search" method="get" class="search-form">
-      <div style="position:relative;">
+      <div class="search-input-wrap">
         <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
@@ -77,13 +77,13 @@ if (decodedQ.trim() && !blocked) {
     {blocked ? (
       <div class="empty-state">
         <p class="empty-state-title">🤖 잠시만 기다려주세요</p>
-        <p class="empty-state-desc" style="max-width:400px; margin:0 auto;">자동화된 요청이 감지되어 검색이 일시적으로 제한되었습니다.</p>
+        <p class="empty-state-desc empty-state-desc-center">자동화된 요청이 감지되어 검색이 일시적으로 제한되었습니다.</p>
       </div>
     ) : decodedQ.trim() ? (
       <div>
-        <h1 class="text-sm text-tertiary mb-6" style="font-weight:var(--font-weight-normal);">
-          "<span class="text-medium" style="color:var(--color-text-primary);">{decodedQ}</span>" 검색 결과
-          <span class="text-accent" style="margin-left:var(--space-2);">{totalCount.toLocaleString()}개</span>
+        <h1 class="text-sm text-tertiary mb-6 search-result-title">
+          "<span class="text-medium search-result-query">{decodedQ}</span>" 검색 결과
+          <span class="text-accent search-result-count">{totalCount.toLocaleString()}개</span>
         </h1>
 
         {dreams.length > 0 ? (
@@ -125,10 +125,10 @@ if (decodedQ.trim() && !blocked) {
     ) : (
       <div class="empty-state">
         <h1 class="empty-state-title">🔍 검색어를 입력하세요</h1>
-        <p class="empty-state-desc" style="margin-bottom:var(--space-8);">꾸신 꿈의 키워드를 입력하면 관련 해몽을 찾아드립니다.</p>
+        <p class="empty-state-desc empty-state-desc-mb">꾸신 꿈의 키워드를 입력하면 관련 해몽을 찾아드립니다.</p>
       </div>
     )}
-  </div>
+  </main>
 
   <script is:inline>
     document.getElementById('search-form').addEventListener('submit', () => { document.getElementById('search-ts').value = Date.now(); });

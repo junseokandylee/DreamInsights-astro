@@ -87,15 +87,15 @@ const ogDescription = dream.meta_description || dream.summary || mainContent.sli
           <span class="separator">›</span>
         </>
       ) : null}
-      <span class="text-secondary" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;">{dream.title}</span>
+      <span class="text-secondary breadcrumb-last">{dream.title}</span>
     </nav>
 
     <header class="mb-8">
       <div class="dream-meta-row mb-4">
-        {dream.category_name && <a href={`/category/${dream.category_slug}`} class="category-pill" style="text-decoration:none;">{dream.category_name}</a>}
+        {dream.category_name && <a href={`/category/${dream.category_slug}`} class="category-pill category-pill-link">{dream.category_name}</a>}
       </div>
-      <h1 class="heading-1" style="max-width:640px; margin-bottom:var(--space-4);">{dream.title}</h1>
-      <div class="dream-meta-row text-sm text-tertiary" style="gap:var(--space-4);">
+      <h1 class="heading-1 dream-title">{dream.title}</h1>
+      <div class="dream-meta-row text-sm text-tertiary dream-meta-gap">
         <span class="dream-meta-badge">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           {(dream.views || 0).toLocaleString()}회 조회
@@ -128,28 +128,28 @@ const ogDescription = dream.meta_description || dream.summary || mainContent.sli
     <div class="dream-body">
       {sections.length >= 1 ? (
         <>
-          <p class="mb-6" style="font-size:18px; color:var(--color-text-primary); line-height:1.8;">{mainContent}</p>
+          <p class="dream-content-lead">{mainContent}</p>
           {sections.map((section: any, i: number) => (
-            <section id={`section-${i}`} class="mt-8" style="padding-top:var(--space-6); border-top:1px solid var(--color-border-default); scroll-margin-top:64px;">
+            <section id={`section-${i}`} class="dream-section">
               <h2 class="heading-2 mb-4">{section.title}</h2>
-              <p style="line-height:1.8; color:var(--color-text-secondary); white-space:pre-line;">{section.body}</p>
+              <p class="dream-section-body">{section.body}</p>
             </section>
           ))}
         </>
       ) : (
         paragraphs.map((p: string, i: number) => (
-          <p id={`para-${i}`} class="mb-4" style="scroll-margin-top:64px; font-size:17px; line-height:1.8; color:var(--color-text-primary);">{p.trim()}</p>
+          <p id={`para-${i}`} class="dream-para">{p.trim()}</p>
         ))
       )}
     </div>
 
     <div class="ad-slot ad-inline">광고 영역</div>
 
-    <div class="action-bar" style="padding:var(--space-6) 0; border-top:1px solid var(--color-border-default); border-bottom:1px solid var(--color-border-default); flex-wrap:wrap;">
+    <div class="action-bar action-bar-inner">
       <span class="text-sm text-tertiary">이 해몽이 도움이 되셨나요?</span>
-      <button id="helpful-btn" data-dream-id={dream.id} class="action-btn" style="background:var(--color-accent); color:white; border:none;">👍 도움됐어요</button>
+      <button id="helpful-btn" data-dream-id={dream.id} class="action-btn action-btn-primary">👍 도움됐어요</button>
       <button id="share-btn" class="action-btn">📋 공유하기</button>
-      <span id="share-toast" style="display:none; padding:var(--space-2) var(--space-3); background:var(--color-success); color:white; border-radius:var(--radius-full); font-size:var(--font-size-xs);">복사 완료!</span>
+      <span id="share-toast" class="share-toast">복사 완료!</span>
     </div>
 
     {(prevDream || nextDream) && (
@@ -161,7 +161,7 @@ const ogDescription = dream.meta_description || dream.summary || mainContent.sli
           </a>
         ) : <div />}
         {nextDream ? (
-          <a href={`/dream/${nextDream.slug}`} style="text-align:right;">
+          <a href={`/dream/${nextDream.slug}`} class="dream-nav-next">
             <span class="dream-nav-label">다음 해몽 →</span>
             <span class="dream-nav-title">{nextDream.title}</span>
           </a>
@@ -172,16 +172,14 @@ const ogDescription = dream.meta_description || dream.summary || mainContent.sli
     {related.length > 0 && (
       <section class="related-section">
         <h2 class="related-title">같은 카테고리의 해몽</h2>
-        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:var(--space-4);">
+        <div class="related-grid">
           {related.map((r: any) => (
             <a href={`/dream/${r.slug}`} class="card dream-card">
               <div class="dream-meta-row mb-2">
-                {r.category_name && <span class="category-pill" style="font-size:11px;">{r.category_name}</span>}
+                {r.category_name && <span class="category-pill related-pill">{r.category_name}</span>}
               </div>
-              <h3 class="text-sm text-semibold" style="line-height:var(--line-height-snug); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">{r.title}</h3>
-              <p class="text-xs text-tertiary" style="display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
-                {r.summary || r.content?.slice(0, 80)}
-              </p>
+              <h3 class="text-sm text-semibold line-clamp-2">{r.title}</h3>
+              <p class="text-xs text-tertiary line-clamp-2">{r.summary || r.content?.slice(0, 80)}</p>
             </a>
           ))}
         </div>

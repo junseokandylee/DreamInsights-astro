@@ -11,7 +11,7 @@ const [popularRecent, popularAllTime] = await Promise.all([
 ---
 
 <BaseLayout title="인기 꿈 해몽 - 드림디비" description="가장 많이 조회된 꿈 해몽과 최근 30일 인기 해몽을 확인하세요.">
-  <div class="container-wide page-section">
+  <main id="main-content" class="container-wide page-section">
     <h1 class="heading-1 mb-8">인기 꿈 해몽</h1>
 
     <div class="tab-bar">
@@ -23,7 +23,7 @@ const [popularRecent, popularAllTime] = await Promise.all([
       {popularRecent.map((dream: any, i: number) => (
         <a href={`/dream/${dream.slug}`} class="card dream-card">
           <div class="dream-card-meta">
-            <span class="text-bold text-xl text-accent" style="opacity:0.5; font-family:var(--font-family-display);">{i + 1}</span>
+            <span class="text-bold text-xl text-accent trending-rank-num">{i + 1}</span>
             {dream.category_name && <span class="category-pill">{dream.category_name}</span>}
             <span class="dream-card-views">👁 {(dream.views || 0).toLocaleString()}</span>
           </div>
@@ -33,11 +33,11 @@ const [popularRecent, popularAllTime] = await Promise.all([
       ))}
     </div>
 
-    <div id="tab-alltime" class="dream-grid" style="display:none;">
+    <div id="tab-alltime" class="dream-grid tab-panel-hidden">
       {popularAllTime.map((dream: any, i: number) => (
         <a href={`/dream/${dream.slug}`} class="card dream-card">
           <div class="dream-card-meta">
-            <span class="text-bold text-xl text-accent" style="opacity:0.5; font-family:var(--font-family-display);">{i + 1}</span>
+            <span class="text-bold text-xl text-accent trending-rank-num">{i + 1}</span>
             {dream.category_name && <span class="category-pill">{dream.category_name}</span>}
             <span class="dream-card-views">👁 {(dream.views || 0).toLocaleString()}</span>
           </div>
@@ -46,7 +46,7 @@ const [popularRecent, popularAllTime] = await Promise.all([
         </a>
       ))}
     </div>
-  </div>
+  </main>
 
   <script is:inline>
     document.querySelectorAll('.trending-tab').forEach(tab => {
@@ -62,6 +62,7 @@ const [popularRecent, popularAllTime] = await Promise.all([
         const target = tab.dataset.target;
         document.querySelectorAll('#tab-recent, #tab-alltime').forEach(panel => {
           panel.style.display = panel.id === 'tab-' + target ? 'grid' : 'none';
+        panel.classList.toggle('tab-panel-hidden', panel.id !== 'tab-' + target);
         });
       });
     });

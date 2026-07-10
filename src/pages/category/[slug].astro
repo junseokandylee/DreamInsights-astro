@@ -45,7 +45,7 @@ const baseUrl = 'https://dream-db.net';
     ]
   })} />
 
-  <div class="container-wide page-section">
+  <main id="main-content" class="container-wide page-section">
     <nav class="breadcrumb mb-6" aria-label="Breadcrumb">
       <a href="/">홈</a><span class="separator">›</span><a href="/category">카테고리</a>
       {category && (<><span class="separator">›</span><span class="text-secondary">{categoryName}</span></>)}
@@ -92,5 +92,5 @@ const baseUrl = 'https://dream-db.net';
         {page < totalPages ? <a href={category ? `/category/${category.slug}?page=${page + 1}` : `/category?page=${page + 1}`}>→</a> : <span class="disabled">→</span>}
       </nav>
     )}
-  </div>
+  </main>
 </BaseLayout>
