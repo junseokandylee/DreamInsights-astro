@@ -1,14 +1,17 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import { t } from '../lib/i18n';
+
+export const prerender = false;
 ---
-<BaseLayout title="페이지를 찾을 수 없습니다 - 드림디비">
+<BaseLayout title={t('ko', 'seo.notFound.title')}>
   <main class="error-page" id="main-content">
     <p class="error-emoji"><span aria-hidden="true">🌙</span></p>
-    <h1 class="error-title">페이지를 찾을 수 없습니다</h1>
-    <p class="error-desc">요청하신 페이지가 존재하지 않거나 이동되었을 수 있습니다.</p>
+    <h1 class="error-title">{t('ko', 'seo.notFound.title')}</h1>
+    <p class="error-desc">{t('ko', 'seo.notFound.description')}</p>
     <div class="error-actions">
-      <a href="/" class="btn btn-primary">홈으로 가기</a>
-      <a href="/search" class="btn btn-secondary">꿈 검색하기</a>
+      <a href="/" class="btn btn-primary">{t('ko', 'common.home')}</a>
+      <a href="/search" class="btn btn-secondary">{t('ko', 'nav.search')}</a>
     </div>
   </main>
 </BaseLayout>

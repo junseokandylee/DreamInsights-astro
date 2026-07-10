@@ -1,0 +1,141 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { query } from '../../lib/db';
+import { t } from '../../lib/i18n';
+import { getLPath } from '../../lib/locale';
+import { LOCALES, DEFAULT_LOCALE, SEO_CONFIG, type Locale } from '../../../shared/lib/i18n/config';
+
+export function getStaticPaths() {
+  return LOCALES.map(locale => ({ params: { locale } }));
+}
+
+const { locale } = Astro.params as { locale: Locale };
+const seoConfig = SEO_CONFIG[locale];
+
+const [popularDreams, trendingDreams, categories] = await Promise.all([
+  query<any>(`SELECT d.id, d.original_slug as slug, d.views, d.created_at, t.title, t.summary, t.content, c.name as category_name, c.slug as category_slug FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = $1 AND t.is_active = true LEFT JOIN categories c ON d.category_id = c.id WHERE d.is_active = true ORDER BY d.views DESC NULLS LAST LIMIT 8`, [locale]),
+  query<any>(`SELECT d.id, d.original_slug as slug, d.views, t.title, t.summary, c.name as category_name FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = $1 AND t.is_active = true LEFT JOIN categories c ON d.category_id = c.id WHERE d.is_active = true AND d.created_at > NOW() - INTERVAL '30 days' ORDER BY d.popularity_score DESC NULLS LAST, d.views DESC NULLS LAST LIMIT 6`, [locale]),
+  query<any>(`SELECT c.name, c.slug, COUNT(*) as dream_count FROM categories c JOIN dream_interpretations d ON d.category_id = c.id AND d.is_active = true JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = $1 AND t.is_active = true GROUP BY c.name, c.slug HAVING COUNT(*) > 0 ORDER BY COUNT(*) DESC LIMIT 20`, [locale])
+]);
+---
+
+<BaseLayout
+  title={seoConfig.siteName}
+  description={seoConfig.siteDescription}
+  locale={locale}
+  alternatePath="/"
+>
+
+  <script type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": seoConfig.siteName,
+    "url": "https://dream-db.net",
+    "description": seoConfig.siteDescription,
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": `https://dream-db.net${getLPath(locale, '/search')}?q={search_term_string}`,
+      "query-input": "required name=search_term_string"
+    }
+  })} />
+
+  <!-- ═══ Hero ═══ -->
+  <section class="hero hero-section" id="main-content">
+    <div class="max-w-[640px] mx-auto text-center relative z-10">
+      <p class="hero-subtitle">{t(locale, 'home.featured')}</p>
+      <h1 class="hero-title">{t(locale, 'home.subtitle')}</h1>
+      <p class="hero-desc">{t(locale, 'home.description')}</p>
+
+      <div class="hero-search hero-search-center">
+        <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <form id="home-search-form" action={getLPath(locale, '/search')} method="get">
+          <input type="search" name="q" class="search-input hero-search-input" placeholder={t(locale, 'search.placeholder')} autocomplete="off" />
+          <input type="text" name="website" value="" tabindex="-1" autocomplete="off" class="honeypot" aria-hidden="true" />
+          <input type="hidden" name="_ts" id="home-search-ts" value="" />
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ Popular Dreams ═══ -->
+  <section class="max-w-[var(--max-width-wide)] mx-auto px-4 py-12">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="heading-2">{t(locale, 'home.featured')}</h2>
+      <a href={getLPath(locale, '/trending')} class="text-sm text-medium link-accent">→</a>
+    </div>
+    <div class="dream-grid">
+      {popularDreams.map((dream: any) => (
+        <a href={getLPath(locale, `/dream/${dream.slug}`)} class="card dream-card">
+          <div class="dream-card-meta">
+            {dream.category_name && <span class="category-pill">{dream.category_name}</span>}
+            <span class="dream-card-views">👁 {(dream.views || 0).toLocaleString()}</span>
+          </div>
+          <h3 class="dream-card-title">{dream.title}</h3>
+          <p class="dream-card-summary">{dream.summary || dream.content?.slice(0, 120)}</p>
+        </a>
+      ))}
+    </div>
+  </section>
+
+  <div class="max-w-[var(--max-width-content)] mx-auto px-4">
+    <div class="ad-slot ad-inline">{t(locale, 'ads.label')}</div>
+  </div>
+
+  <!-- ═══ Trending ═══ -->
+  <section class="trending-bg-section">
+    <div class="max-w-[var(--max-width-wide)] mx-auto">
+      <div class="flex items-center mb-6 trending-header">
+        <span class="trending-emoji">🔥</span>
+        <h2 class="heading-2 trending-heading">{t(locale, 'nav.recent')} {t(locale, 'nav.popular')}</h2>
+      </div>
+      <div class="trending-grid-3col">
+        {trendingDreams.map((dream: any, i: number) => (
+          <a href={getLPath(locale, `/dream/${dream.slug}`)} class="trending-list-item">
+            <span class="trending-rank">{i + 1}</span>
+            <div class="trending-item-body">
+              <h3 class="trending-item-title">{dream.title}</h3>
+              <div class="dream-meta-row">
+                {dream.category_name && <span class="category-pill text-xs">{dream.category_name}</span>}
+                <span class="text-xs text-tertiary">👁 {(dream.views || 0).toLocaleString()}</span>
+              </div>
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ Categories ═══ -->
+  <section class="max-w-[var(--max-width-wide)] mx-auto px-4 py-12">
+    <h2 class="heading-2 centered-block">{t(locale, 'home.categories')}</h2>
+    <div class="flex flex-wrap gap-3 justify-center">
+      {categories.map((cat: any) => (
+        <a href={getLPath(locale, `/category/${cat.slug}`)} class="category-tag">
+          <span>#{cat.name}</span>
+          <span class="text-xs text-tertiary">{cat.dream_count.toLocaleString()}</span>
+        </a>
+      ))}
+    </div>
+  </section>
+
+  <!-- ═══ SEO Content ═══ -->
+  <section class="max-w-[var(--max-width-content)] mx-auto px-4 py-12">
+    <article class="seo-article">
+      <h2 class="seo-article-title">{seoConfig.siteName} — {t(locale, 'home.about.title')}</h2>
+      <p class="mb-4">{t(locale, 'home.about.content')}</p>
+      <p class="mb-4"><strong>{t(locale, 'home.about.features.title')}</strong></p>
+      <ul class="seo-list">
+        <li>{t(locale, 'home.about.features.database')}</li>
+        <li>{t(locale, 'home.about.features.categories')}</li>
+        <li>{t(locale, 'home.about.features.ai')}</li>
+        <li>{t(locale, 'home.about.features.mobile')}</li>
+      </ul>
+    </article>
+  </section>
+
+  <script is:inline>
+    document.getElementById('home-search-form').addEventListener('submit', () => { document.getElementById('home-search-ts').value = Date.now(); });
+  </script>
+</BaseLayout>

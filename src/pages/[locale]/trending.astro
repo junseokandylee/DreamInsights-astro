@@ -1,0 +1,91 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { query } from '../../lib/db';
+import { t } from '../../lib/i18n';
+import { getLPath, BASE_URL } from '../../lib/locale';
+import { LOCALES, SEO_CONFIG, type Locale } from '../../../shared/lib/i18n/config';
+
+export function getStaticPaths() {
+  return LOCALES.map(locale => ({ params: { locale } }));
+}
+
+export const prerender = false;
+
+const { locale } = Astro.params as { locale: Locale };
+const seoConfig = SEO_CONFIG[locale];
+
+const [popularRecent, popularAllTime] = await Promise.all([
+  query<any>(`SELECT d.id, d.original_slug as slug, d.views, t.title, t.summary, c.name as category_name FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = $1 AND t.is_active = true LEFT JOIN categories c ON d.category_id = c.id WHERE d.is_active = true AND d.created_at > NOW() - INTERVAL '30 days' ORDER BY d.views DESC NULLS LAST LIMIT 12`, [locale]),
+  query<any>(`SELECT d.id, d.original_slug as slug, d.views, t.title, t.summary, c.name as category_name FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = $1 AND t.is_active = true LEFT JOIN categories c ON d.category_id = c.id WHERE d.is_active = true ORDER BY d.views DESC NULLS LAST LIMIT 12`, [locale])
+]);
+---
+
+<BaseLayout title={`${t(locale, 'nav.popular')} - ${seoConfig.siteName}`} description={seoConfig.siteDescription} locale={locale} alternatePath="/trending">
+  <script type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": t(locale, 'nav.popular'),
+    "description": seoConfig.siteDescription,
+    "url": `${BASE_URL}/trending`,
+    "mainEntity": {
+      "@type": "ItemList",
+      "numberOfItems": popularRecent.length,
+      "itemListElement": popularRecent.map((d: any, i: number) => ({
+        "@type": "ListItem",
+        "position": i + 1,
+        "name": d.title,
+        "url": `${BASE_URL}/dream/${d.slug}`
+      }))
+    }
+  })} />
+  <main id="main-content" class="container-wide page-section">
+    <h1 class="heading-1 mb-8">{t(locale, 'nav.popular')}</h1>
+
+    <div class="tab-bar">
+      <button class="trending-tab trending-tab-active" data-target="recent">🔥 30D</button>
+      <button class="trending-tab" data-target="alltime">🏆 All</button>
+    </div>
+
+    <div id="tab-recent" class="dream-grid">
+      {popularRecent.map((dream: any, i: number) => (
+        <a href={getLPath(locale, `/dream/${dream.slug}`)} class="card dream-card">
+          <div class="dream-card-meta">
+            <span class="text-bold text-xl text-accent trending-rank-num">{i + 1}</span>
+            {dream.category_name && <span class="category-pill">{dream.category_name}</span>}
+            <span class="dream-card-views">👁 {(dream.views || 0).toLocaleString()}</span>
+          </div>
+          <h3 class="dream-card-title">{dream.title}</h3>
+          <p class="dream-card-summary">{dream.summary || dream.content?.slice(0, 120)}</p>
+        </a>
+      ))}
+    </div>
+
+    <div id="tab-alltime" class="dream-grid tab-panel-hidden">
+      {popularAllTime.map((dream: any, i: number) => (
+        <a href={getLPath(locale, `/dream/${dream.slug}`)} class="card dream-card">
+          <div class="dream-card-meta">
+            <span class="text-bold text-xl text-accent trending-rank-num">{i + 1}</span>
+            {dream.category_name && <span class="category-pill">{dream.category_name}</span>}
+            <span class="dream-card-views">👁 {(dream.views || 0).toLocaleString()}</span>
+          </div>
+          <h3 class="dream-card-title">{dream.title}</h3>
+          <p class="dream-card-summary">{dream.summary || dream.content?.slice(0, 120)}</p>
+        </a>
+      ))}
+    </div>
+  </main>
+
+  <script is:inline>
+    document.querySelectorAll('.trending-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.trending-tab').forEach(t => t.classList.remove('trending-tab-active'));
+        tab.classList.add('trending-tab-active');
+        const target = tab.dataset.target;
+        document.querySelectorAll('#tab-recent, #tab-alltime').forEach(panel => {
+          panel.style.display = panel.id === 'tab-' + target ? 'grid' : 'none';
+          panel.classList.toggle('tab-panel-hidden', panel.id !== 'tab-' + target);
+        });
+      });
+    });
+  </script>
+</BaseLayout>

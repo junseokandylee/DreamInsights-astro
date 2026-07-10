@@ -1,0 +1,110 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { query } from '../../../lib/db';
+import { t } from '../../../lib/i18n';
+import { getLPath, BASE_URL } from '../../../lib/locale';
+import { LOCALES, SEO_CONFIG, type Locale } from '../../../../shared/lib/i18n/config';
+
+export function getStaticPaths() {
+  return LOCALES.map(locale => ({ params: { locale } }));
+}
+
+export const prerender = false;
+
+const { locale } = Astro.params as { locale: Locale };
+const seoConfig = SEO_CONFIG[locale];
+
+const { slug } = Astro.params;
+const decodedSlug = decodeURIComponent(slug || 'all');
+const page = Math.max(1, parseInt(Astro.url.searchParams.get('page') || '1', 10) || 1);
+const PER_PAGE = 24;
+
+let category = null;
+let categoryName = t(locale, 'nav.categories');
+const categoryList = await query<any>(`
+  SELECT name, slug, COUNT(*) as dream_count FROM categories c
+  JOIN dream_interpretations d ON d.category_id = c.id AND d.is_active = true
+  JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = $1 AND t.is_active = true
+  GROUP BY c.name, c.slug HAVING COUNT(*) > 0 ORDER BY COUNT(*) DESC
+`, [locale]);
+
+if (slug && slug !== 'all') {
+  const cats = await query<any>(`SELECT name, slug FROM categories WHERE slug = $1`, [decodedSlug]);
+  category = cats[0];
+  categoryName = category?.name || decodedSlug;
+}
+
+const offset = (page - 1) * PER_PAGE;
+const [dreams, countResult] = await Promise.all([
+  query<any>(`SELECT d.id, d.original_slug as slug, d.views, t.title, t.summary, t.content, c.name as category_name, c.slug as category_slug FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = $1 AND t.is_active = true LEFT JOIN categories c ON d.category_id = c.id ${category ? `WHERE d.category_id = (SELECT id FROM categories WHERE slug = $2)` : 'WHERE 1=1'} AND d.is_active = true ORDER BY d.views DESC NULLS LAST LIMIT ${PER_PAGE} OFFSET ${offset}`, category ? [locale, decodedSlug] : [locale]),
+  query<any>(`SELECT COUNT(*) as total FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = $1 AND t.is_active = true ${category ? `WHERE d.category_id = (SELECT id FROM categories WHERE slug = $2)` : 'WHERE 1=1'} AND d.is_active = true`, category ? [locale, decodedSlug] : [locale])
+]);
+
+const totalCount = countResult[0]?.total || 0;
+const totalPages = Math.ceil(totalCount / PER_PAGE);
+---
+
+<BaseLayout title={`${categoryName} - ${seoConfig.siteName}`} description={seoConfig.siteDescription} locale={locale} alternatePath={`/category/${category?.slug || ''}`}>
+  {totalPages > 1 && (
+    <link rel="canonical" href={`${BASE_URL}${getLPath(locale, `/category/${category?.slug || ''}`)}?page=${page}`} />
+  )}
+  {page > 1 && <link rel="prev" href={`${BASE_URL}${getLPath(locale, `/category/${category?.slug || ''}`)}?page=${page - 1}`} />}
+  {page < totalPages && <link rel="next" href={`${BASE_URL}${getLPath(locale, `/category/${category?.slug || ''}`)}?page=${page + 1}`} />}
+  <script type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org", "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": t(locale, 'breadcrumb.home'), "item": BASE_URL },
+      { "@type": "ListItem", "position": 2, "name": t(locale, 'breadcrumb.category'), "item": `${BASE_URL}/category` },
+      ...(category ? [{ "@type": "ListItem", "position": 3, "name": categoryName, "item": `${BASE_URL}/category/${category.slug}` }] : [])
+    ]
+  })} />
+
+  <main id="main-content" class="container-wide page-section">
+    <nav class="breadcrumb mb-6" aria-label="Breadcrumb">
+      <a href={getLPath(locale, '/')}>{t(locale, 'breadcrumb.home')}</a><span class="separator">›</span><a href={getLPath(locale, '/category')}>{t(locale, 'breadcrumb.category')}</a>
+      {category && (<><span class="separator">›</span><span class="text-secondary">{categoryName}</span></>)}
+    </nav>
+
+    <nav class="category-nav">
+      <a href={getLPath(locale, '/category')} class:list={['category-pill', { 'category-nav-active': !category }]}>{t(locale, 'filters.all')}</a>
+      {categoryList.map((cat: any) => (
+        <a href={getLPath(locale, `/category/${cat.slug}`)} class:list={['category-pill', { 'category-nav-active': category?.slug === cat.slug }]}>
+          {cat.name} <span class="category-nav-count">{cat.dream_count}</span>
+        </a>
+      ))}
+    </nav>
+
+    <div class="mb-8">
+      <h1 class="heading-1 mb-2">{categoryName}</h1>
+      <p class="text-secondary">{totalCount.toLocaleString()}</p>
+    </div>
+
+    <div class="dream-grid">
+      {dreams.map((dream: any) => (
+        <a href={getLPath(locale, `/dream/${dream.slug}`)} class="card dream-card">
+          <div class="dream-card-meta">
+            {dream.category_name && <span class="category-pill">{dream.category_name}</span>}
+            <span class="dream-card-views">👁 {(dream.views || 0).toLocaleString()}</span>
+          </div>
+          <h3 class="dream-card-title">{dream.title}</h3>
+          <p class="dream-card-summary">{dream.summary || dream.content?.slice(0, 120)}</p>
+        </a>
+      ))}
+    </div>
+
+    {totalPages > 1 && (
+      <nav class="pagination" aria-label="Pagination">
+        {page > 1 ? <a href={category ? `${getLPath(locale, `/category/${category.slug}`)}?page=${page - 1}` : `${getLPath(locale, '/category')}?page=${page - 1}`}>←</a> : <span class="disabled">←</span>}
+        {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+          const start = page <= 4 ? 1 : Math.max(1, page - 3);
+          const end = Math.min(totalPages, start + 6);
+          if (i + start > end) return null;
+          const p = i + start;
+          const href = category ? `${getLPath(locale, `/category/${category.slug}`)}?page=${p}` : `${getLPath(locale, '/category')}?page=${p}`;
+          return p === page ? <span class="active">{p}</span> : <a href={href}>{p}</a>;
+        })}
+        {page < totalPages ? <a href={category ? `${getLPath(locale, `/category/${category.slug}`)}?page=${page + 1}` : `${getLPath(locale, '/category')}?page=${page + 1}`}>→</a> : <span class="disabled">→</span>}
+      </nav>
+    )}
+  </main>
+</BaseLayout>

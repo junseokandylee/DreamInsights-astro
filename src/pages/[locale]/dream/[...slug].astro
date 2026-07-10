@@ -1,0 +1,285 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { query } from '../../../lib/db';
+import { t } from '../../../lib/i18n';
+import { getLPath, BASE_URL } from '../../../lib/locale';
+import { LOCALES, DEFAULT_LOCALE, SEO_CONFIG, type Locale } from '../../../../shared/lib/i18n/config';
+
+export function getStaticPaths() {
+  return LOCALES.map(locale => ({ params: { locale } }));
+}
+
+export const prerender = false;
+
+const { locale } = Astro.params as { locale: Locale };
+const seoConfig = SEO_CONFIG[locale];
+
+const { slug } = Astro.params;
+const decodedSlug = decodeURIComponent(slug || '');
+
+const dreams = await query<any>(`
+  SELECT
+    d.id, d.original_slug as slug, d.category_id,
+    d.views, d.shares, d.created_at, d.updated_at,
+    t.title, t.content, t.summary,
+    t.meta_title, t.meta_description,
+    c.name as category_name, c.slug as category_slug
+  FROM dream_interpretations d
+  JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = $1 AND t.is_active = true
+  LEFT JOIN categories c ON d.category_id = c.id
+  WHERE d.original_slug = $2 AND d.is_active = true
+`, [locale, decodedSlug]);
+
+const dream = dreams[0];
+if (!dream) return Astro.redirect('/404');
+
+const related = await query<any>(`
+  SELECT d.original_slug as slug, d.views,
+         t.title, t.content, t.summary,
+         c.name as category_name
+  FROM dream_interpretations d
+  JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = $1 AND t.is_active = true
+  LEFT JOIN categories c ON d.category_id = c.id
+  WHERE d.category_id = $2 AND d.original_slug != $3 AND d.is_active = true
+  ORDER BY d.views DESC NULLS LAST
+  LIMIT 9
+`, [locale, dream.category_id, decodedSlug]);
+
+const [prevDream] = await query<any>(`
+  SELECT d.original_slug as slug, t.title
+  FROM dream_interpretations d
+  JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = $1 AND t.is_active = true
+  WHERE d.original_slug < $2 AND d.is_active = true
+  ORDER BY d.original_slug DESC LIMIT 1
+`, [locale, decodedSlug]);
+
+const [nextDream] = await query<any>(`
+  SELECT d.original_slug as slug, t.title
+  FROM dream_interpretations d
+  JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = $1 AND t.is_active = true
+  WHERE d.original_slug > $2 AND d.is_active = true
+  ORDER BY d.original_slug ASC LIMIT 1
+`, [locale, decodedSlug]);
+
+const contentParts = dream.content.split('##').filter(Boolean);
+const mainContent = contentParts[0]?.trim() || dream.content;
+const sections = contentParts.slice(1).map((s: string) => {
+  const lines = s.split('\n');
+  return { title: lines[0]?.trim(), body: lines.slice(1).join('\n').trim() };
+});
+
+const paragraphs = sections.length === 0
+  ? dream.content.split(/\n\n+/).filter((p: string) => p.trim().length > 30)
+  : [];
+
+query(`UPDATE dream_interpretations SET views = COALESCE(views, 0) + 1 WHERE id = $1`, [dream.id]).catch(() => {});
+
+const ogDescription = dream.meta_description || dream.summary || mainContent.slice(0, 160);
+---
+
+<BaseLayout
+  title={dream.meta_title || dream.title}
+  description={ogDescription}
+  type="article"
+  canonicalUrl={`${BASE_URL}/dream/${dream.slug}`}
+  ogImage={`${BASE_URL}/og/${dream.slug}?lang=${locale}`}
+  locale={locale}
+  alternatePath={`/dream/${dream.slug}`}
+>
+  <div class="reading-progress" id="reading-progress"></div>
+
+  <article class="dream-content">
+    <nav class="breadcrumb mb-6" aria-label="Breadcrumb">
+      <a href={getLPath(locale, '/')}>{t(locale, 'breadcrumb.home')}</a>
+      <span class="separator">›</span>
+      {dream.category_name ? (
+        <>
+          <a href={getLPath(locale, `/category/${dream.category_slug}`)}>{dream.category_name}</a>
+          <span class="separator">›</span>
+        </>
+      ) : null}
+      <span class="text-secondary breadcrumb-last">{dream.title}</span>
+    </nav>
+
+    <header class="mb-8">
+      <div class="dream-meta-row mb-4">
+        {dream.category_name && <a href={getLPath(locale, `/category/${dream.category_slug}`)} class="category-pill category-pill-link">{dream.category_name}</a>}
+      </div>
+      <h1 class="heading-1 dream-title">{dream.title}</h1>
+      <div class="dream-meta-row text-sm text-tertiary dream-meta-gap">
+        <span class="dream-meta-badge">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          {(dream.views || 0).toLocaleString()}
+        </span>
+        {dream.updated_at && (
+          <time datetime={dream.updated_at} class="dream-meta-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            {new Date(dream.updated_at).toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric' })}
+          </time>
+        )}
+      </div>
+    </header>
+
+    {(sections.length >= 2 || paragraphs.length >= 2) && (
+      <nav class="toc" aria-label="TOC">
+        <div class="toc-title">TOC</div>
+        <ol class="toc-list">
+          {sections.length >= 2
+            ? sections.map((s: any, i: number) => (
+                <li><a href={`#section-${i}`}>{s.title}</a></li>
+              ))
+            : paragraphs.map((p: string, i: number) => (
+                <li><a href={`#para-${i}`}>{p.trim().slice(0, 40)}…</a></li>
+              ))
+          }
+        </ol>
+      </nav>
+    )}
+
+    <div class="dream-body">
+      {sections.length >= 1 ? (
+        <>
+          <p class="dream-content-lead">{mainContent}</p>
+          {sections.map((section: any, i: number) => (
+            <section id={`section-${i}`} class="dream-section">
+              <h2 class="heading-2 mb-4">{section.title}</h2>
+              <p class="dream-section-body">{section.body}</p>
+            </section>
+          ))}
+        </>
+      ) : (
+        paragraphs.map((p: string, i: number) => (
+          <p id={`para-${i}`} class="dream-para">{p.trim()}</p>
+        ))
+      )}
+    </div>
+
+    <div class="ad-slot ad-inline">{t(locale, 'ads.label')}</div>
+
+    <div class="action-bar action-bar-inner">
+      <span class="text-sm text-tertiary">👍</span>
+      <button id="helpful-btn" data-dream-id={dream.id} class="action-btn action-btn-primary">👍</button>
+      <button id="share-btn" class="action-btn">📋</button>
+      <span id="share-toast" class="share-toast">✓</span>
+    </div>
+
+    {(prevDream || nextDream) && (
+      <nav class="dream-nav" aria-label="Prev/Next">
+        {prevDream ? (
+          <a href={getLPath(locale, `/dream/${prevDream.slug}`)}>
+            <span class="dream-nav-label">← {t(locale, 'common.back')}</span>
+            <span class="dream-nav-title">{prevDream.title}</span>
+          </a>
+        ) : <div />}
+        {nextDream ? (
+          <a href={getLPath(locale, `/dream/${nextDream.slug}`)} class="dream-nav-next">
+            <span class="dream-nav-label">{t(locale, 'common.next')} →</span>
+            <span class="dream-nav-title">{nextDream.title}</span>
+          </a>
+        ) : <div />}
+      </nav>
+    )}
+
+    {related.length > 0 && (
+      <section class="related-section">
+        <h2 class="related-title">{t(locale, 'dream.related')}</h2>
+        <div class="related-grid">
+          {related.map((r: any) => (
+            <a href={getLPath(locale, `/dream/${r.slug}`)} class="card dream-card">
+              <div class="dream-meta-row mb-2">
+                {r.category_name && <span class="category-pill related-pill">{r.category_name}</span>}
+              </div>
+              <h3 class="text-sm text-semibold line-clamp-2">{r.title}</h3>
+              <p class="text-xs text-tertiary line-clamp-2">{r.summary || r.content?.slice(0, 80)}</p>
+            </a>
+          ))}
+        </div>
+      </section>
+    )}
+
+    <div class="ad-slot ad-inline">{t(locale, 'ads.label')}</div>
+  </article>
+
+  <script type="application/ld+json" set:html={JSON.stringify([
+    {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "headline": dream.title,
+      "description": ogDescription,
+      "author": { "@type": "Organization", "name": seoConfig.siteName },
+      "publisher": {
+        "@type": "Organization",
+        "name": seoConfig.siteName,
+        "logo": { "@type": "ImageObject", "url": `${BASE_URL}/logo.png` }
+      },
+      "datePublished": dream.created_at,
+      "dateModified": dream.updated_at,
+      "mainEntityOfPage": { "@type": "WebPage", "@id": `${BASE_URL}/dream/${dream.slug}` }
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": t(locale, 'breadcrumb.home'), "item": BASE_URL },
+        ...(dream.category_name ? [{
+          "@type": "ListItem", "position": 2, "name": dream.category_name,
+          "item": `${BASE_URL}/category/${dream.category_slug}`
+        }] : []),
+        { "@type": "ListItem", "position": dream.category_name ? 3 : 2, "name": dream.title,
+          "item": `${BASE_URL}/dream/${dream.slug}` }
+      ]
+    }
+  ])} />
+
+  <script type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [{
+      "@type": "Question",
+      "name": dream.title,
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": (dream.summary || mainContent || dream.content || '').slice(0, 1000)
+      }
+    }]
+  })} />
+
+  <script is:inline>
+    const bar = document.getElementById('reading-progress');
+    window.addEventListener('scroll', () => {
+      const h = document.documentElement;
+      bar.style.width = Math.min((h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100, 100) + '%';
+    });
+
+    const helpfulBtn = document.getElementById('helpful-btn');
+    const STORAGE_KEY = 'dreamdb_helpful';
+    if (helpfulBtn) {
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+      const dreamId = helpfulBtn.dataset.dreamId;
+      if (stored[dreamId]) {
+        helpfulBtn.style.opacity = '0.5';
+        helpfulBtn.style.cursor = 'default';
+      }
+      helpfulBtn.addEventListener('click', () => {
+        if (stored[dreamId]) return;
+        stored[dreamId] = true;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+        helpfulBtn.style.opacity = '0.5';
+        helpfulBtn.style.cursor = 'default';
+      });
+    }
+
+    const shareBtn = document.getElementById('share-btn');
+    const shareToast = document.getElementById('share-toast');
+    if (shareBtn) {
+      shareBtn.addEventListener('click', async () => {
+        const url = window.location.href;
+        const title = document.querySelector('h1')?.textContent || '';
+        if (navigator.share) { try { await navigator.share({ title, url }); return; } catch {} }
+        await navigator.clipboard.writeText(url);
+        shareToast.style.display = 'inline';
+        setTimeout(() => shareToast.style.display = 'none', 2000);
+      });
+    }
+  </script>
+</BaseLayout>

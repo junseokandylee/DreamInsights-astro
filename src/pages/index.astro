@@ -1,22 +1,51 @@
 ---
+/**
+ * Root index — serves as locale detector/redirect.
+ * Default locale (ko) renders directly, others redirect to /en/ etc.
+ * For SSR, we detect Accept-Language and redirect or serve.
+ */
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { query } from '../lib/db';
+import { t } from '../lib/i18n';
+import { getLPath } from '../lib/locale';
+import { SEO_CONFIG, DEFAULT_LOCALE, type Locale } from '../../shared/lib/i18n/config';
+
+export const prerender = false;
+
+// Detect locale from path or Accept-Language
+const acceptLang = Astro.request.headers.get('accept-language') || '';
+const preferred = acceptLang.split(',')[0]?.split(';')[0]?.trim().substring(0, 2);
+const LOCALES = ['ko', 'en', 'ja', 'zh', 'hi', 'es', 'fr', 'ar', 'ru', 'id'] as const;
+const detectedLocale: Locale = (LOCALES as readonly string[]).includes(preferred || '') ? preferred as Locale : DEFAULT_LOCALE;
+
+// If not ko, redirect to the localized path
+if (detectedLocale !== DEFAULT_LOCALE) {
+  return Astro.redirect(getLPath(detectedLocale, '/'));
+}
+
+// For ko (default), serve the home page directly
+const seoConfig = SEO_CONFIG[DEFAULT_LOCALE];
 
 const [popularDreams, trendingDreams, categories] = await Promise.all([
-  query<any>(`SELECT d.id, d.original_slug as slug, d.views, d.created_at, t.title, t.summary, t.content, c.name as category_name, c.slug as category_slug FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true LEFT JOIN categories c ON d.category_id = c.id WHERE d.is_active = true ORDER BY d.views DESC NULLS LAST LIMIT 8`),
-  query<any>(`SELECT d.id, d.original_slug as slug, d.views, t.title, t.summary, c.name as category_name FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true LEFT JOIN categories c ON d.category_id = c.id WHERE d.is_active = true AND d.created_at > NOW() - INTERVAL '30 days' ORDER BY d.popularity_score DESC NULLS LAST, d.views DESC NULLS LAST LIMIT 6`),
-  query<any>(`SELECT c.name, c.slug, COUNT(*) as dream_count FROM categories c JOIN dream_interpretations d ON d.category_id = c.id AND d.is_active = true JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true GROUP BY c.name, c.slug HAVING COUNT(*) > 0 ORDER BY COUNT(*) DESC LIMIT 20`)
+  query<any>(`SELECT d.id, d.original_slug as slug, d.views, d.created_at, t.title, t.summary, t.content, c.name as category_name, c.slug as category_slug FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = $1 AND t.is_active = true LEFT JOIN categories c ON d.category_id = c.id WHERE d.is_active = true ORDER BY d.views DESC NULLS LAST LIMIT 8`, [DEFAULT_LOCALE]),
+  query<any>(`SELECT d.id, d.original_slug as slug, d.views, t.title, t.summary, c.name as category_name FROM dream_interpretations d JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = $1 AND t.is_active = true LEFT JOIN categories c ON d.category_id = c.id WHERE d.is_active = true AND d.created_at > NOW() - INTERVAL '30 days' ORDER BY d.popularity_score DESC NULLS LAST, d.views DESC NULLS LAST LIMIT 6`, [DEFAULT_LOCALE]),
+  query<any>(`SELECT c.name, c.slug, COUNT(*) as dream_count FROM categories c JOIN dream_interpretations d ON d.category_id = c.id AND d.is_active = true JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = $1 AND t.is_active = true GROUP BY c.name, c.slug HAVING COUNT(*) > 0 ORDER BY COUNT(*) DESC LIMIT 20`, [DEFAULT_LOCALE])
 ]);
 ---
 
-<BaseLayout title="드림디비 — AI 꿈 해몽" description="당신의 꿈이 의미하는 바를 AI가 분석해 드립니다. 수만 개의 꿈 해몽 사전, 인기 해몽, 카테고리별 꿈 해석.">
+<BaseLayout
+  title={seoConfig.siteName}
+  description={seoConfig.siteDescription}
+  locale={DEFAULT_LOCALE}
+  alternatePath="/"
+>
 
   <script type="application/ld+json" set:html={JSON.stringify({
     "@context": "https://schema.org",
     "@type": "WebSite",
-    "name": "드림디비",
+    "name": seoConfig.siteName,
     "url": "https://dream-db.net",
-    "description": "수만 개의 꿈 해몽 데이터를 AI로 분석한 꿈 해몽 사전",
+    "description": seoConfig.siteDescription,
     "potentialAction": {
       "@type": "SearchAction",
       "target": "https://dream-db.net/search?q={search_term_string}",
@@ -27,16 +56,16 @@ const [popularDreams, trendingDreams, categories] = await Promise.all([
   <!-- ═══ Hero ═══ -->
   <section class="hero hero-section" id="main-content">
     <div class="max-w-[640px] mx-auto text-center relative z-10">
-      <p class="hero-subtitle">AI 꿈 해몽 사전</p>
-      <h1 class="hero-title">당신의 꿈이<br>의미하는 바를 알아보세요</h1>
-      <p class="hero-desc">수만 개의 꿈 해몽 데이터로 분석한 결과를 확인하세요.</p>
+      <p class="hero-subtitle">{t(DEFAULT_LOCALE, 'home.featured')}</p>
+      <h1 class="hero-title">{t(DEFAULT_LOCALE, 'home.subtitle')}</h1>
+      <p class="hero-desc">{t(DEFAULT_LOCALE, 'home.description')}</p>
 
       <div class="hero-search hero-search-center">
         <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
         <form id="home-search-form" action="/search" method="get">
-          <input type="search" name="q" class="search-input hero-search-input" placeholder="꿈을 검색하세요… (예: 물고기, 이사, 합격)" autocomplete="off" />
+          <input type="search" name="q" class="search-input hero-search-input" placeholder={t(DEFAULT_LOCALE, 'search.placeholder')} autocomplete="off" />
           <input type="text" name="website" value="" tabindex="-1" autocomplete="off" class="honeypot" aria-hidden="true" />
           <input type="hidden" name="_ts" id="home-search-ts" value="" />
         </form>
@@ -47,8 +76,8 @@ const [popularDreams, trendingDreams, categories] = await Promise.all([
   <!-- ═══ Popular Dreams ═══ -->
   <section class="max-w-[var(--max-width-wide)] mx-auto px-4 py-12">
     <div class="flex items-center justify-between mb-6">
-      <h2 class="heading-2">인기 해몽</h2>
-      <a href="/trending" class="text-sm text-medium link-accent">더보기 →</a>
+      <h2 class="heading-2">{t(DEFAULT_LOCALE, 'home.featured')}</h2>
+      <a href="/trending" class="text-sm text-medium link-accent">→</a>
     </div>
     <div class="dream-grid">
       {popularDreams.map((dream: any) => (
@@ -65,7 +94,7 @@ const [popularDreams, trendingDreams, categories] = await Promise.all([
   </section>
 
   <div class="max-w-[var(--max-width-content)] mx-auto px-4">
-    <div class="ad-slot ad-inline">광고 영역</div>
+    <div class="ad-slot ad-inline">{t(DEFAULT_LOCALE, 'ads.label')}</div>
   </div>
 
   <!-- ═══ Trending ═══ -->
@@ -73,7 +102,7 @@ const [popularDreams, trendingDreams, categories] = await Promise.all([
     <div class="max-w-[var(--max-width-wide)] mx-auto">
       <div class="flex items-center mb-6 trending-header">
         <span class="trending-emoji">🔥</span>
-        <h2 class="heading-2 trending-heading">최근 인기 해몽</h2>
+        <h2 class="heading-2 trending-heading">{t(DEFAULT_LOCALE, 'nav.recent')} {t(DEFAULT_LOCALE, 'nav.popular')}</h2>
       </div>
       <div class="trending-grid-3col">
         {trendingDreams.map((dream: any, i: number) => (
@@ -94,7 +123,7 @@ const [popularDreams, trendingDreams, categories] = await Promise.all([
 
   <!-- ═══ Categories ═══ -->
   <section class="max-w-[var(--max-width-wide)] mx-auto px-4 py-12">
-    <h2 class="heading-2 centered-block">꿈 해몽 카테고리</h2>
+    <h2 class="heading-2 centered-block">{t(DEFAULT_LOCALE, 'home.categories')}</h2>
     <div class="flex flex-wrap gap-3 justify-center">
       {categories.map((cat: any) => (
         <a href={`/category/${cat.slug}`} class="category-tag">
@@ -108,18 +137,15 @@ const [popularDreams, trendingDreams, categories] = await Promise.all([
   <!-- ═══ SEO Content ═══ -->
   <section class="max-w-[var(--max-width-content)] mx-auto px-4 py-12">
     <article class="seo-article">
-      <h2 class="seo-article-title">드림디비 — 꿈 해몽을 위한 AI 검색 사전</h2>
-      <p class="mb-4">드림디비는 수만 개의 꿈 해몽 데이터를 AI로 분석하여, 당신이 꾼 꿈의 의미를 쉽고 정확하게 찾아볼 수 있도록 도와주는 서비스입니다. 동물, 자연, 사람, 건강, 금전 등 다양한 카테고리의 꿈 해석을 제공합니다.</p>
-      <p class="mb-4">전통적인 꿈 해몽과 함께, 현대적인 심리학적 관점에서의 꿈 분석도 함께 제공하여 더 깊이 있는 이해를 돕습니다. 꿈 검색창에 꾼 꿈의 키워드를 입력하시면 관련 해몽을 즉시 확인할 수 있습니다.</p>
-      <p class="mb-4"><strong>주요 기능:</strong></p>
+      <h2 class="seo-article-title">{seoConfig.siteName} — {t(DEFAULT_LOCALE, 'home.about.title')}</h2>
+      <p class="mb-4">{t(DEFAULT_LOCALE, 'home.about.content')}</p>
+      <p class="mb-4"><strong>{t(DEFAULT_LOCALE, 'home.about.features.title')}</strong></p>
       <ul class="seo-list">
-        <li>4만 개 이상의 꿈 해몽 데이터베이스</li>
-        <li>동물, 자연, 사람, 건강, 금전 등 카테고리별 분류</li>
-        <li>AI 기반 키워드 검색으로 빠른 해몽 찾기</li>
-        <li>인기 해몽과 최근 트렌딩 해몽 제공</li>
-        <li>간편한 카테고리 탐색으로 관심 분야 접근</li>
+        <li>{t(DEFAULT_LOCALE, 'home.about.features.database')}</li>
+        <li>{t(DEFAULT_LOCALE, 'home.about.features.categories')}</li>
+        <li>{t(DEFAULT_LOCALE, 'home.about.features.ai')}</li>
+        <li>{t(DEFAULT_LOCALE, 'home.about.features.mobile')}</li>
       </ul>
-      <p>꿈에서 물고기가 나오면 좋은 소식이, 뱀이 나오면 변화나 시련을 의미할 수 있습니다. 비가 오는 꿈, 이사하는 꿈, 시험에 합격하는 꿈 — 우리가 꾸는 꿈마다 다양한 의미가 담겨 있습니다. 드림디비와 함께 당신의 꿈이 전하는 메시지를 해석해 보세요.</p>
     </article>
   </section>
 

@@ -1,7 +1,8 @@
-import { query } from '../../lib/db.js';
+import { query } from '../../../lib/db.js';
 import { Resvg } from '@resvg/resvg-js';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { SEO_CONFIG, isValidLocale } from '../../../../shared/lib/i18n/config';
 
 export const prerender = false;
 
@@ -36,18 +37,22 @@ function wrapText(text, max = 22) {
 
 export async function GET({ params }) {
   const slug = params.slug;
+  const localeParam = params.locale || 'ko';
+  const locale = isValidLocale(localeParam) ? localeParam : 'ko';
+
   if (!slug) return new Response('Missing slug', { status: 400 });
 
   try {
     const result = await query(`
       SELECT d.original_slug as slug, t.title, c.name as category_name
       FROM dream_interpretations d
-      JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = 'ko' AND t.is_active = true
+      JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = $1 AND t.is_active = true
       LEFT JOIN categories c ON d.category_id = c.id
-      WHERE d.original_slug = $1
-    `, [slug]);
+      WHERE d.original_slug = $2
+    `, [locale, slug]);
 
     const dream = result.rows?.[0];
+    const siteName = SEO_CONFIG[locale].siteName;
     const title = dream?.title || slug.replace(/-/g, ' ');
     const category = dream?.category_name || '';
     const font = await getFont();
@@ -72,7 +77,7 @@ export async function GET({ params }) {
   </defs>
   <rect width="${WIDTH}" height="${HEIGHT}" fill="url(#bg)"/>
   <rect x="60" y="380" width="${WIDTH - 120}" height="1" fill="rgba(255,255,255,0.3)"/>
-  <text x="80" y="210" font-family="'Noto Sans KR'" font-weight="500" font-size="24" fill="rgba(255,255,255,0.7)">🌙 드림디비 꿈 해몽</text>
+  <text x="80" y="210" font-family="'Noto Sans KR'" font-weight="500" font-size="24" fill="rgba(255,255,255,0.7)">🌙 ${esc(siteName)}</text>
   ${textEls}
   ${catBadge}
   <text x="${WIDTH - 120}" y="${HEIGHT - 40}" font-family="'Noto Sans KR'" font-size="16" fill="rgba(255,255,255,0.5)" text-anchor="end">dream-db.net</text>

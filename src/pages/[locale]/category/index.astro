@@ -1,0 +1,64 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { query } from '../../../lib/db';
+import { t } from '../../../lib/i18n';
+import { getLPath, BASE_URL } from '../../../lib/locale';
+import { LOCALES, SEO_CONFIG, type Locale } from '../../../../shared/lib/i18n/config';
+
+export function getStaticPaths() {
+  return LOCALES.map(locale => ({ params: { locale } }));
+}
+
+const { locale } = Astro.params as { locale: Locale };
+const seoConfig = SEO_CONFIG[locale];
+
+const categories = await query<any>(`
+  SELECT c.name, c.slug, COUNT(*) as dream_count
+  FROM categories c
+  JOIN dream_interpretations d ON d.category_id = c.id AND d.is_active = true
+  JOIN interpretation_content t ON d.id = t.interpretation_id AND t.language_code = $1 AND t.is_active = true
+  GROUP BY c.name, c.slug
+  HAVING COUNT(*) > 0
+  ORDER BY COUNT(*) DESC
+`, [locale]);
+
+const ICONS: Record<string, string> = {
+  animal: '🐾', nature: '🌿', money: '💰', person: '👤', death: '🪦',
+  food: '🍽️', traffic: '🚗', house: '🏠', marriage: '💍', birth: '👶'
+};
+---
+
+<BaseLayout title={`${t(locale, 'nav.categories')} - ${seoConfig.siteName}`} description={seoConfig.siteDescription} locale={locale} alternatePath="/category">
+  <script type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": t(locale, 'nav.categories'),
+    "description": seoConfig.siteDescription,
+    "url": `${BASE_URL}/category`,
+    "mainEntity": {
+      "@type": "ItemList",
+      "numberOfItems": categories.length,
+      "itemListElement": categories.map((cat: any, i: number) => ({
+        "@type": "ListItem",
+        "position": i + 1,
+        "name": cat.name,
+        "url": `${BASE_URL}/category/${cat.slug}`
+      }))
+    }
+  })} />
+
+  <main id="main-content" class="max-w-[var(--max-width-content)] mx-auto px-4 page-section">
+    <h1 class="heading-1 mb-3">{t(locale, 'nav.categories')}</h1>
+    <p class="text-secondary mb-8">{t(locale, 'categories.description')}</p>
+
+    <div class="category-grid">
+      {categories.map((cat: any) => (
+        <a href={getLPath(locale, `/category/${cat.slug}`)} class="card category-card">
+          <div class="category-icon"><span aria-hidden="true">{ICONS[cat.slug] || '🌙'}</span></div>
+          <h2 class="category-card-name">{cat.name}</h2>
+          <span class="text-xs text-tertiary">{cat.dream_count.toLocaleString()}</span>
+        </a>
+      ))}
+    </div>
+  </main>
+</BaseLayout>
